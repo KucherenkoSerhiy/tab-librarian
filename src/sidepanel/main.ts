@@ -1653,6 +1653,16 @@ async function init(): Promise<void> {
     // ignore loading-progress noise; only meaningful changes matter to the list
     if (changeInfo.url || changeInfo.title || changeInfo.status === "complete") tabsDirty = true;
   });
+  // window/tab focus changes and moves don't fire the events above — without
+  // these, counts go stale when the user works in another window
+  chrome.tabs.onActivated?.addListener(() => (tabsDirty = true));
+  chrome.tabs.onAttached?.addListener(() => (tabsDirty = true));
+  chrome.tabs.onDetached?.addListener(() => (tabsDirty = true));
+  chrome.windows?.onFocusChanged?.addListener(() => (tabsDirty = true));
+  // panel re-shown (window switch, panel reopen) → full refresh, not just a poll tick
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void refreshAll();
+  });
   setInterval(() => void pollDirty(), 2000);
 }
 

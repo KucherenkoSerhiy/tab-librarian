@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AI Smart Tab Manager",
-  "version": "0.2.0",
-  "description": "Organize your open tabs into persistent bookmark folders with an AI chat assistant. Bring your own API key.",
+  "name": "Tab Librarian",
+  "version": "0.3.0",
+  "description": "Your AI librarian for tabs: files 100+ open tabs into a tidy bookmark library you approve, so you can close them without fear. BYOK.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -17,15 +17,15 @@
   },
   "sidebar_action": {
     "default_panel": "sidepanel.html",
-    "default_title": "AI Smart Tab Manager",
+    "default_title": "Tab Librarian",
     "default_icon": "icons/icon48.png"
   },
   "action": {
-    "default_title": "AI Smart Tab Manager"
+    "default_title": "Tab Librarian"
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "ai-smart-tab-manager@kucherenkoserhiy.dev",
+      "id": "tab-librarian@kucherenkoserhiy.dev",
       "strict_min_version": "121.0"
     }
   }

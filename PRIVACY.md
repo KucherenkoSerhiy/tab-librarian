@@ -1,4 +1,4 @@
-# Privacy Policy — AI Smart Tab Manager
+# Privacy Policy — Tab Librarian
 
 _Last updated: 2026-09-04_
 
@@ -7,7 +7,7 @@ _Last updated: 2026-09-04_
 ## What the extension accesses
 
 - **Open tabs** (title, URL, pinned state, window) — to show them in the panel and let you sort them.
-- **Bookmarks** — the extension creates and manages folders/bookmarks inside its own "AI Smart Tab Manager" folder. It never modifies bookmarks outside that folder.
+- **Bookmarks** — the extension creates and manages folders/bookmarks inside its own "Tab Librarian" folder. It never modifies bookmarks outside that folder.
 
 ## What leaves your device
 

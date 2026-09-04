@@ -87,7 +87,7 @@
   mk("2", "Other bookmarks", "0");
   const create = ({ parentId, title, url }) => clone(mk(String(++idCounter), title, parentId, url));
 
-  const root = create({ parentId: "2", title: "AI Smart Tab Manager" });
+  const root = create({ parentId: "2", title: "Tab Librarian" });
   const work = create({ parentId: root.id, title: "Work" });
   const clientA = create({ parentId: work.id, title: "Client A" });
   create({ parentId: clientA.id, title: "Figma – Design system", url: "https://figma.com/file/abc" });

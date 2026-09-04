@@ -1,4 +1,4 @@
-# AI Smart Tab Manager
+# Tab Librarian
 
 A Manifest V3 extension for Chrome/Brave that organizes 100+ open tabs into a **persistent, nested bookmark folder structure** through an AI chat in the side panel. Bring your own Anthropic API key — no backend, no proxy.
 
@@ -20,7 +20,7 @@ Every destructive or filing action (file, unfile, close tab(s), delete folder, a
 3. Hit **Sort all tabs** (or describe your taxonomy in chat — project names, rules for edge cases).
 4. The model proposes a folder tree with every tab assigned; ambiguous tabs come back as questions. Nothing is applied yet.
 5. Keep chatting to refine — each reply produces a fresh, complete proposal.
-6. **Approve & apply** creates real bookmark folders + bookmarks under a dedicated `AI Smart Tab Manager` folder in *Other Bookmarks*. Applying is **bookmarks-only** — open tabs are never touched by the AI pipeline; tabs change only through explicit user buttons (close tab, close-all in a cluster, close sorted, open folder as tabs).
+6. **Approve & apply** creates real bookmark folders + bookmarks under a dedicated `Tab Librarian` folder in *Other Bookmarks*. Applying is **bookmarks-only** — open tabs are never touched by the AI pipeline; tabs change only through explicit user buttons (close tab, close-all in a cluster, close sorted, open folder as tabs).
 
 **Maintenance**
 - Drag an unsorted tab onto any folder (or use ＋) to file it instantly — no LLM call.
@@ -79,7 +79,7 @@ Other scripts: `npm run build:firefox` produces `dist-firefox/` (sidebar_action 
 Things that will need justification at listing time:
 
 - **`tabs` permission** — reads title/URL of open tabs so the user can sort them. Tab data is sent to `api.anthropic.com` *only* when the user sends a chat message, using their own key.
-- **`bookmarks`** — creates/moves bookmarks inside the extension's own `AI Smart Tab Manager` folder only.
+- **`bookmarks`** — creates/moves bookmarks inside the extension's own `Tab Librarian` folder only.
 - **`host_permissions: api.anthropic.com`** — direct BYOK API calls; no other host is contacted. Identity-linked API keys additionally need the workspace ID (Options field) sent as the `anthropic-workspace-id` header.
 - **`favicon`** — renders real site icons (via Chrome's internal `_favicon` endpoint, no network requests) in the tab lists, tree, and proposal review.
 

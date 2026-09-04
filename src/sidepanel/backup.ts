@@ -110,7 +110,7 @@ export async function clearSnapshots(): Promise<number> {
 /** Download the whole managed tree + metadata as a JSON file the user can park anywhere. */
 export async function exportBackup(): Promise<void> {
   const payload = {
-    format: "ai-smart-tab-manager-backup",
+    format: "tab-librarian-backup",
     version: 1,
     exportedAt: new Date().toISOString(),
     ...(await collectState()),
@@ -119,7 +119,7 @@ export async function exportBackup(): Promise<void> {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `tab-manager-backup-${new Date().toISOString().slice(0, 10)}.json`;
+  a.download = `tab-librarian-backup-${new Date().toISOString().slice(0, 10)}.json`;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
@@ -133,8 +133,9 @@ export async function importBackup(file: File): Promise<{ bookmarks: number }> {
     format?: string;
     tree?: chrome.bookmarks.BookmarkTreeNode;
   };
-  if (payload.format !== "ai-smart-tab-manager-backup" || !payload.tree) {
-    throw new Error("That file is not an AI Smart Tab Manager backup.");
+  const KNOWN_FORMATS = ["tab-librarian-backup", "ai-smart-tab-manager-backup"]; // old exports stay importable
+  if (!KNOWN_FORMATS.includes(payload.format ?? "") || !payload.tree) {
+    throw new Error("That file is not a Tab Librarian backup.");
   }
 
   const existing = new Set<string>();

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>AI Smart Tab Manager</title>
+  <title>Tab Librarian</title>
   <link rel="stylesheet" href="./sidepanel/styles.css" />
 </head>
 <body>
@@ -11,7 +11,7 @@
   <!-- ============ HOME ============ -->
   <div id="view-home" class="view">
     <header class="bar">
-      <h1>AI Smart Tab Manager</h1>
+      <h1>Tab Librarian</h1>
       <span id="statsText" class="bar-stats"></span>
       <button id="optionsBtn" class="icon-btn" title="Options" aria-label="Options">⚙</button>
     </header>
@@ -124,7 +124,7 @@
       <span class="bar-spacer"></span>
     </header>
     <div class="scroll pad">
-      <p id="setupIntro" class="lead">Let's get set up. AI Smart Tab Manager files your open tabs into nested bookmark folders you approve — with your own API key.</p>
+      <p id="setupIntro" class="lead">Let's get set up. Tab Librarian files your open tabs into nested bookmark folders you approve — with your own API key.</p>
 
       <details class="opt-section" open>
         <summary><h3>AI provider</h3></summary>
@@ -181,7 +181,7 @@
         </div>
         <input type="file" id="importBackupFile" accept="application/json" hidden />
         <div id="snapshotList" class="snap-list"></div>
-        <span class="hint">Snapshots live only in this extension's private storage on this device — nothing is uploaded. To inspect them: your browser's extensions page → AI Smart Tab Manager → "service worker" → Console → <code>chrome.storage.local.get('backups')</code>. Export downloads the tree as a JSON file; import merges one back and never deletes anything.</span>
+        <span class="hint">Snapshots live only in this extension's private storage on this device — nothing is uploaded. To inspect them: your browser's extensions page → Tab Librarian → "service worker" → Console → <code>chrome.storage.local.get('backups')</code>. Export downloads the tree as a JSON file; import merges one back and never deletes anything.</span>
       </details>
     </div>
     <div class="apply-bar">

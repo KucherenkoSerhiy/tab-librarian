@@ -9,7 +9,9 @@ import {
 } from "./storage";
 import { normalizeUrl } from "./urls";
 
-const ROOT_TITLE = "AI Smart Tab Manager";
+const ROOT_TITLE = "Tab Librarian";
+// pre-rebrand root folders are adopted (and renamed) instead of duplicated
+const LEGACY_ROOT_TITLES = ["AI Smart Tab Manager", "Tab Sorter"];
 const OTHER_BOOKMARKS_ID = "2"; // Chromium convention: 1 = Bookmarks Bar, 2 = Other Bookmarks
 
 type BookmarkNode = chrome.bookmarks.BookmarkTreeNode;
@@ -37,7 +39,12 @@ export async function ensureManagedRoot(): Promise<string> {
   }
 
   const siblings = await chrome.bookmarks.getChildren(parentId);
-  const existing = siblings.find((n) => !n.url && n.title === ROOT_TITLE);
+  const existing = siblings.find(
+    (n) => !n.url && (n.title === ROOT_TITLE || LEGACY_ROOT_TITLES.includes(n.title))
+  );
+  if (existing && existing.title !== ROOT_TITLE) {
+    await chrome.bookmarks.update(existing.id, { title: ROOT_TITLE });
+  }
   const root = existing ?? (await chrome.bookmarks.create({ parentId, title: ROOT_TITLE }));
   await setManagedRootId(root.id);
   return root.id;

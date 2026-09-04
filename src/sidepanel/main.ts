@@ -1133,7 +1133,8 @@ function renderReview(): void {
 
   const questionsEl = $("reviewQuestions");
   questionsEl.replaceChildren();
-  for (const q of pendingProposal.questions) {
+  const questions = pendingProposal.questions ?? [];
+  for (const q of questions) {
     const div = document.createElement("div");
     div.className = "question";
     const question = document.createElement("div");
@@ -1141,9 +1142,71 @@ function renderReview(): void {
     const url = document.createElement("div");
     url.className = "q-url";
     url.textContent = q.url;
-    div.append(question, url);
+
+    const controls = document.createElement("div");
+    controls.className = "q-controls";
+    const input = document.createElement("input");
+    input.type = "text";
+    input.className = "answer-input";
+    input.placeholder = "Type an answer…";
+    input.dataset.q = q.question;
+    input.dataset.url = q.url;
+    input.addEventListener("input", updateSendAnswersState);
+
+    // knows-the-answer shortcut: file it directly, no AI round trip needed
+    const fileBtn = document.createElement("button");
+    fileBtn.className = "add-btn";
+    fileBtn.title = "Skip the question — file this tab into a folder now";
+    fileBtn.textContent = "⤷";
+    fileBtn.addEventListener("click", async () => {
+      const folders = await listFolders();
+      toggleFolderSelect(controls, folders, (folderId) => {
+        void (async () => {
+          const tabs = await getOpenTabs();
+          const title = tabs.find((t) => normalizeUrl(t.url) === normalizeUrl(q.url))?.title ?? q.url;
+          await fileTabManually({ title, url: q.url }, folderId);
+          if (pendingProposal) {
+            pendingProposal.questions = pendingProposal.questions.filter((x) => x !== q);
+            await persistChat();
+          }
+          showToast("Filed ✓ — question resolved", () => unfileQuietly(q.url));
+          renderReview();
+        })();
+      });
+    });
+
+    controls.append(input, fileBtn);
+    div.append(question, url, controls);
     questionsEl.appendChild(div);
   }
+
+  if (questions.length) {
+    const send = document.createElement("button");
+    send.id = "sendAnswersBtn";
+    send.className = "btn primary";
+    send.textContent = "Send answers to AI";
+    send.disabled = true;
+    send.addEventListener("click", () => {
+      const answers = [...document.querySelectorAll<HTMLInputElement>(".answer-input")]
+        .filter((i) => i.value.trim())
+        .map((i) => `- "${i.dataset.q}" (${i.dataset.url}) → ${i.value.trim()}`);
+      if (!answers.length) return;
+      showView("home");
+      setDrawer(true);
+      void sendChat(
+        `Answers to your questions:\n${answers.join("\n")}\nPlease update the proposal accordingly.`
+      );
+    });
+    questionsEl.appendChild(send);
+  }
+}
+
+function updateSendAnswersState(): void {
+  const btn = document.getElementById("sendAnswersBtn") as HTMLButtonElement | null;
+  if (!btn) return;
+  btn.disabled = ![...document.querySelectorAll<HTMLInputElement>(".answer-input")].some((i) =>
+    i.value.trim()
+  );
 }
 
 async function approveProposal(): Promise<void> {

@@ -78,6 +78,33 @@
       await wait(100);
     });
 
+    await t("questions offer inline answers + direct filing", async () => {
+      $("resumeReviewBtn").click();
+      await wait(200);
+      const input = document.querySelector(".answer-input");
+      assert(input, "no answer input on question");
+      const sendBtn = document.getElementById("sendAnswersBtn");
+      assert(sendBtn && sendBtn.disabled, "send-answers should start disabled");
+      input.value = "Entertainment";
+      input.dispatchEvent(new Event("input"));
+      assert(!sendBtn.disabled, "send-answers did not enable after typing");
+      // direct-file path resolves the question without any AI round trip
+      const before = document.querySelectorAll("#reviewQuestions .question").length;
+      document.querySelector("#reviewQuestions .add-btn").click();
+      await wait(150);
+      const select = document.querySelector("#reviewQuestions .inline-select");
+      assert(select, "no folder select on question card");
+      select.value = select.options[1].value;
+      select.dispatchEvent(new Event("change"));
+      await wait(400);
+      assert(
+        document.querySelectorAll("#reviewQuestions .question").length === before - 1,
+        "question not resolved after direct filing"
+      );
+      $("reviewBackBtn").click();
+      await wait(100);
+    });
+
     await t("apply proposal then undo reverts", async () => {
       const counts = () => `${$("unsortedPanelCount").textContent}/${$("foldersPanelCount").textContent}`;
       const before = counts();

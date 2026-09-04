@@ -397,6 +397,38 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 
 .inline-select { width: 100%; margin: 4px 0 2px; }
 
+.folder-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 8px;
+}
+.picker-input { width: 100%; min-height: 38px; }
+.picker-list {
+  max-height: 220px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.picker-item {
+  font: inherit;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: pre;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.picker-item:hover, .picker-item.active { background: var(--accent-soft); color: var(--accent); }
+
 /* ---------- folder tree ---------- */
 
 .tree { display: flex; flex-direction: column; gap: 6px; }

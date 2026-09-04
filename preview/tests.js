@@ -95,14 +95,17 @@
       input.value = "Entertainment";
       input.dispatchEvent(new Event("input"));
       assert(!sendBtn.disabled, "send-answers did not enable after typing");
-      // direct-file path resolves the question without any AI round trip
+      // direct-file path resolves the question without any AI round trip:
+      // type to filter, Enter to pick
       const before = document.querySelectorAll("#reviewQuestions .question").length;
       document.querySelector("#reviewQuestions .add-btn").click();
       await wait(150);
-      const select = document.querySelector("#reviewQuestions .inline-select");
-      assert(select, "no folder select on question card");
-      select.value = select.options[1].value;
-      select.dispatchEvent(new Event("change"));
+      const pickerInput = document.querySelector("#reviewQuestions .folder-picker .picker-input");
+      assert(pickerInput, "no folder picker on question card");
+      pickerInput.value = "work";
+      pickerInput.dispatchEvent(new Event("input"));
+      await wait(100);
+      pickerInput.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
       await wait(400);
       assert(
         document.querySelectorAll("#reviewQuestions .question").length === before - 1,
@@ -212,14 +215,25 @@
       assert($("recentlyClosed").hidden, "strip did not clear");
     });
 
-    await t("folder picker renders as an indented tree", async () => {
+    await t("folder picker: indented tree + type-to-filter", async () => {
       document.querySelector("#unsorted .tab-row .add-btn").click();
       await wait(150);
-      const select = document.querySelector(".inline-select");
-      assert(select, "no folder select opened");
-      const nested = [...select.options].find((o) => o.textContent.includes("└"));
-      assert(nested, "no indented nested option found");
-      select.remove();
+      const picker = document.querySelector(".folder-picker");
+      assert(picker, "no folder picker opened");
+      const nested = [...picker.querySelectorAll(".picker-item")].find((o) =>
+        o.textContent.includes("└")
+      );
+      assert(nested, "no indented nested item found");
+      const input = picker.querySelector(".picker-input");
+      input.value = "client";
+      input.dispatchEvent(new Event("input"));
+      await wait(100);
+      const items = [...picker.querySelectorAll(".picker-item")];
+      assert(
+        items.length === 1 && items[0].textContent.includes("Work / Client A"),
+        `filtering failed: ${items.map((i) => i.textContent).join(" | ")}`
+      );
+      picker.remove();
     });
 
     await t("folder rename input appears on double-click", async () => {

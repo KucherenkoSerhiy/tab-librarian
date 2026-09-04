@@ -312,28 +312,6 @@ function folderOptionLabel(path: string[]): string {
   return depth === 0 ? path[0]! : `${"   ".repeat(depth)}└ ${path[path.length - 1]}`;
 }
 
-function makeFolderSelect(
-  folders: { id: string; path: string[] }[],
-  onPick: (folderId: string) => void
-): HTMLSelectElement {
-  const select = document.createElement("select");
-  select.className = "inline-select";
-  const placeholder = document.createElement("option");
-  placeholder.textContent = "Choose a folder…";
-  placeholder.value = "";
-  select.appendChild(placeholder);
-  for (const folder of folders) {
-    const opt = document.createElement("option");
-    opt.value = folder.id;
-    opt.textContent = folderOptionLabel(folder.path);
-    opt.title = folder.path.join(" / ");
-    select.appendChild(opt);
-  }
-  select.addEventListener("change", () => {
-    if (select.value) onPick(select.value);
-  });
-  return select;
-}
 
 /**
  * Closing every tab in a window closes the window — and the browser, if it was
@@ -394,7 +372,11 @@ async function openOrFocusTab(url: string): Promise<void> {
   }
 }
 
-/** Toggle an inline folder select right after `anchor`; only one open at a time. */
+/**
+ * Toggle a type-ahead folder picker right after `anchor`; only one open at a
+ * time. Empty query shows the indented tree; typing filters by full path
+ * (Enter picks the highlighted match, arrows navigate, Escape closes).
+ */
 function toggleFolderSelect(
   anchor: HTMLElement,
   folders: { id: string; path: string[] }[],
@@ -406,9 +388,74 @@ function toggleFolderSelect(
     return;
   }
   document.querySelectorAll(".inline-select").forEach((el) => el.remove());
-  const select = makeFolderSelect(folders, onPick);
-  anchor.after(select);
-  select.focus();
+
+  const box = document.createElement("div");
+  box.className = "inline-select folder-picker";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "picker-input";
+  input.placeholder = "Type to filter folders…";
+
+  const list = document.createElement("div");
+  list.className = "picker-list";
+
+  let active = 0;
+  let matches: { id: string; path: string[] }[] = [];
+  const render = () => {
+    const query = input.value.trim().toLowerCase();
+    matches = folders.filter((f) => f.path.join(" / ").toLowerCase().includes(query));
+    list.replaceChildren();
+    matches.forEach((folder, i) => {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "picker-item" + (i === active ? " active" : "");
+      // filtered matches show the full path so hits deep in the tree stay legible
+      item.textContent = query ? folder.path.join(" / ") : folderOptionLabel(folder.path);
+      item.title = folder.path.join(" / ");
+      item.addEventListener("click", () => {
+        box.remove();
+        onPick(folder.id);
+      });
+      list.appendChild(item);
+    });
+    if (!matches.length) {
+      const none = document.createElement("div");
+      none.className = "empty-note";
+      none.textContent = "No folders match.";
+      list.appendChild(none);
+    }
+  };
+  render();
+
+  input.addEventListener("input", () => {
+    active = 0;
+    render();
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+      box.remove();
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      active = Math.min(active + 1, matches.length - 1);
+      render();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      active = Math.max(active - 1, 0);
+      render();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      const pick = matches[active];
+      if (pick) {
+        box.remove();
+        onPick(pick.id);
+      }
+    }
+  });
+
+  box.append(input, list);
+  anchor.after(box);
+  input.focus();
 }
 
 // ---------- chat ----------

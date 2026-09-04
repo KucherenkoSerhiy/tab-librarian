@@ -10,6 +10,9 @@ export default defineConfig({
     outDir: r("dist"),
     emptyOutDir: true,
     target: "chrome120",
+    // extension pages reject <link rel="modulepreload"> ("cross-world resource
+    // mismatch" warnings in chrome://extensions); the chunks load fine without it
+    modulePreload: false,
     rollupOptions: {
       input: {
         sidepanel: r("src/sidepanel.html"),

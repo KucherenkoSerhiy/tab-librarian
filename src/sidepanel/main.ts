@@ -139,14 +139,17 @@ async function getOpenTabs(): Promise<OpenTabInfo[]> {
         tab.id !== undefined &&
         (settings.includeLocalFiles || !isLocalFileUrl(url))
     )
-    .map(({ tab, url }) => ({
-      tabId: tab.id!,
-      windowId: tab.windowId,
-      title: tab.title || url,
-      url,
-      pinned: tab.pinned,
-      sorted: normalizeUrl(url) in placements,
-    }));
+    .map(({ tab, url }) => {
+      lastKnownTabs.set(tab.id!, { url, title: tab.title || url });
+      return {
+        tabId: tab.id!,
+        windowId: tab.windowId,
+        title: tab.title || url,
+        url,
+        pinned: tab.pinned,
+        sorted: normalizeUrl(url) in placements,
+      };
+    });
 }
 
 async function buildContextBlock(): Promise<string> {
@@ -872,6 +875,7 @@ async function renderTree(): Promise<void> {
             ? `Opened ${tabIds.length} tabs · ${blocked} local file(s) blocked (needs “Allow access to file URLs”)`
             : `Opened ${tabIds.length} tabs`;
           showToast(note, async () => {
+            suppressCloseTrackingUntil = Date.now() + 3000; // undoing an open-all keeps bookmarks
             await chrome.tabs.remove(tabIds).catch(() => {});
           });
           await refreshAll();
@@ -1570,7 +1574,7 @@ async function refreshAll(): Promise<void> {
   lastFullRefresh = Date.now();
   try {
     await reconcile();
-    await Promise.all([renderStats(), renderTree(), renderUnsorted()]);
+    await Promise.all([renderStats(), renderTree(), renderUnsorted(), renderRecentlyClosed()]);
   } finally {
     refreshQueued = false;
   }
@@ -1582,6 +1586,97 @@ function debounce(fn: () => void, ms: number): () => void {
     clearTimeout(timer);
     timer = setTimeout(fn, ms);
   };
+}
+
+// ---------- "closed just now" tracking ----------
+// Closing a managed tab keeps its bookmark (the library's promise), but for
+// consumed content the user may want the bookmark gone too — offer it, opt-in.
+
+interface RecentlyClosedEntry {
+  url: string;
+  title: string;
+  at: number;
+}
+const recentlyClosed: RecentlyClosedEntry[] = [];
+const lastKnownTabs = new Map<number, { url: string; title: string }>();
+// bulk closes ("Close sorted tabs", undo of open-all) explicitly mean "keep bookmarks"
+let suppressCloseTrackingUntil = 0;
+const RC_TTL_MS = 10 * 60 * 1000;
+
+function addRecentlyClosed(entry: RecentlyClosedEntry): void {
+  const key = normalizeUrl(entry.url);
+  const existing = recentlyClosed.findIndex((e) => normalizeUrl(e.url) === key);
+  if (existing >= 0) recentlyClosed.splice(existing, 1);
+  recentlyClosed.unshift(entry);
+  while (recentlyClosed.length > 5) recentlyClosed.pop();
+  void renderRecentlyClosed();
+}
+
+async function renderRecentlyClosed(): Promise<void> {
+  const el = $("recentlyClosed");
+  const placements = await getPlacements();
+  const openNow = new Set((await getOpenTabs()).map((t) => normalizeUrl(t.url)));
+  const cutoff = Date.now() - RC_TTL_MS;
+  for (let i = recentlyClosed.length - 1; i >= 0; i--) {
+    const entry = recentlyClosed[i]!;
+    const key = normalizeUrl(entry.url);
+    // expired, reopened, or no longer in the library → nothing left to decide
+    if (entry.at < cutoff || openNow.has(key) || !(key in placements)) {
+      recentlyClosed.splice(i, 1);
+    }
+  }
+  el.replaceChildren();
+  el.hidden = recentlyClosed.length === 0;
+  if (!recentlyClosed.length) return;
+
+  const head = document.createElement("div");
+  head.className = "rc-head";
+  head.textContent = "Closed just now — keep in library?";
+  el.appendChild(head);
+
+  for (const entry of recentlyClosed) {
+    const row = document.createElement("div");
+    row.className = "rc-row";
+    row.appendChild(makeIcon(entry.url, 20));
+
+    const title = document.createElement("span");
+    title.className = "rc-title";
+    title.textContent = entry.title;
+    title.title = `${entry.url} — click to reopen`;
+    title.addEventListener("click", () => void openOrFocusTab(entry.url));
+    row.appendChild(title);
+
+    const keep = document.createElement("button");
+    keep.className = "mini-btn accent-hover";
+    keep.title = "Keep the bookmark";
+    keep.textContent = "✓";
+    keep.addEventListener("click", () => {
+      recentlyClosed.splice(recentlyClosed.indexOf(entry), 1);
+      void renderRecentlyClosed();
+    });
+    row.appendChild(keep);
+
+    const remove = document.createElement("button");
+    remove.className = "mini-btn danger-hover";
+    remove.title = "Remove the bookmark too";
+    remove.textContent = "🗑";
+    remove.addEventListener("click", () => {
+      void (async () => {
+        const current = await getPlacements();
+        const placement = current[normalizeUrl(entry.url)];
+        if (placement) {
+          const removed = await removeManagedBookmark(placement.bookmarkId);
+          showToast("Bookmark removed", removed ? () => restoreRemovedBookmark(removed) : undefined);
+        }
+        recentlyClosed.splice(recentlyClosed.indexOf(entry), 1);
+        await renderRecentlyClosed();
+        await refreshAll();
+      })();
+    });
+    row.appendChild(remove);
+
+    el.appendChild(row);
+  }
 }
 
 // Browser events only mark state dirty; a 2-second poll does the actual
@@ -1681,6 +1776,7 @@ async function init(): Promise<void> {
     const sorted = (await getOpenTabs()).filter((t) => t.sorted);
     if (!sorted.length) return;
     const urls = sorted.map((t) => t.url);
+    suppressCloseTrackingUntil = Date.now() + 3000; // bulk close = "keep the bookmarks"
     await chrome.tabs.remove(sorted.map((t) => t.tabId));
     showToast(`Closed ${sorted.length} sorted tab${sorted.length === 1 ? "" : "s"}`, () =>
       reopenTabs(urls)
@@ -1791,7 +1887,21 @@ async function init(): Promise<void> {
   chrome.bookmarks.onMoved.addListener(markBookmarksDirty);
   chrome.bookmarks.onChanged.addListener(markBookmarksDirty);
   chrome.tabs.onCreated.addListener(() => (tabsDirty = true));
-  chrome.tabs.onRemoved.addListener(() => (tabsDirty = true));
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    tabsDirty = true;
+    const known = lastKnownTabs.get(tabId);
+    lastKnownTabs.delete(tabId);
+    if (!known || Date.now() < suppressCloseTrackingUntil) return;
+    void (async () => {
+      const placements = await getPlacements();
+      if (!(normalizeUrl(known.url) in placements)) return; // wasn't in the library
+      const stillOpen = (await getOpenTabs()).some(
+        (t) => normalizeUrl(t.url) === normalizeUrl(known.url)
+      );
+      if (stillOpen) return; // a duplicate remains — nothing to decide yet
+      addRecentlyClosed({ url: known.url, title: known.title, at: Date.now() });
+    })();
+  });
   chrome.tabs.onUpdated.addListener((_id, changeInfo) => {
     // ignore loading-progress noise; only meaningful changes matter to the list
     if (changeInfo.url || changeInfo.title || changeInfo.status === "complete") tabsDirty = true;

@@ -195,6 +195,23 @@
       );
     });
 
+    await t("closing a managed tab offers optional bookmark removal", async () => {
+      // HN became managed in the direct-filing test above; close all its open tabs
+      const hnTabs = (await chrome.tabs.query({})).filter((t) =>
+        (t.url || "").includes("news.ycombinator")
+      );
+      assert(hnTabs.length > 0, "no HN tabs to close");
+      await chrome.tabs.remove(hnTabs.map((t) => t.id));
+      await wait(600);
+      const strip = $("recentlyClosed");
+      assert(!strip.hidden && strip.querySelector(".rc-row"), "closed-managed strip missing");
+      // remove the bookmark from the strip
+      strip.querySelector(".mini-btn.danger-hover").click();
+      await wait(500);
+      assert(/Bookmark removed/.test(document.querySelector("#toast .toast-text").textContent), "no removal toast");
+      assert($("recentlyClosed").hidden, "strip did not clear");
+    });
+
     await t("folder picker renders as an indented tree", async () => {
       document.querySelector("#unsorted .tab-row .add-btn").click();
       await wait(150);

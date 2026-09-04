@@ -213,6 +213,36 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   flex-shrink: 0;
 }
 
+/* "closed just now" strip — optional bookmark cleanup after closing a managed tab */
+.rc-list { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+.rc-head {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+}
+.rc-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 4px 6px 4px 10px;
+  min-height: 40px;
+}
+.rc-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  cursor: pointer;
+}
+.rc-title:hover { color: var(--accent); }
+
 .panel {
   display: flex;
   flex-direction: column;

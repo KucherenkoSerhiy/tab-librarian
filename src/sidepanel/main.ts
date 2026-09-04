@@ -127,14 +127,20 @@ async function getOpenTabs(): Promise<OpenTabInfo[]> {
   const tabs = await chrome.tabs.query(settings.includeAllWindows ? {} : { currentWindow: true });
   const placements = await getPlacements();
   return tabs
-    .filter((t) => isSortableUrl(t.url) && t.id !== undefined)
     .map((t) => ({
-      tabId: t.id!,
-      windowId: t.windowId,
-      title: t.title ?? t.url!,
-      url: t.url!,
-      pinned: t.pinned,
-      sorted: normalizeUrl(t.url!) in placements,
+      tab: t,
+      // tabs not yet loaded since browser restart have url === "" and the real
+      // address in pendingUrl — without this they'd be invisible to the panel
+      url: t.url || t.pendingUrl || "",
+    }))
+    .filter(({ tab, url }) => isSortableUrl(url) && tab.id !== undefined)
+    .map(({ tab, url }) => ({
+      tabId: tab.id!,
+      windowId: tab.windowId,
+      title: tab.title || url,
+      url,
+      pinned: tab.pinned,
+      sorted: normalizeUrl(url) in placements,
     }));
 }
 
@@ -442,7 +448,6 @@ async function renderStats(): Promise<void> {
   const unsorted = tabs.filter((t) => !t.sorted).length;
   const sorted = tabs.length - unsorted;
   const bookmarkTotal = countBookmarks(tree);
-  $("statsText").textContent = `${unsorted} unsorted · ${sorted} sorted · ${folders.length} folders`;
   $("unsortedPanelCount").textContent = String(unsorted);
   const foldersCount = $("foldersPanelCount");
   foldersCount.textContent = String(bookmarkTotal);

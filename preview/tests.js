@@ -20,8 +20,14 @@
   async function run() {
     await wait(800); // let the app initialize
 
-    await t("home renders with stats", async () => {
-      assert(/unsorted/.test($("statsText").textContent), "statsText empty");
+    await t("home renders with panel counters", async () => {
+      assert(/^\d+$/.test($("unsortedPanelCount").textContent), "unmanaged counter empty");
+      assert(/^\d+$/.test($("foldersPanelCount").textContent), "managed counter empty");
+    });
+
+    await t("sleeping tabs (pendingUrl only) are counted", async () => {
+      const titles = [...document.querySelectorAll("#unsorted .tab-title")].map((e) => e.textContent);
+      assert(titles.some((t) => t.includes("Sleeping – restored tab")), "pendingUrl tab missing");
     });
 
     await t("no vertical page overflow", async () => {
@@ -73,7 +79,8 @@
     });
 
     await t("apply proposal then undo reverts", async () => {
-      const before = $("statsText").textContent;
+      const counts = () => `${$("unsortedPanelCount").textContent}/${$("foldersPanelCount").textContent}`;
+      const before = counts();
       $("resumeReviewBtn").click();
       await wait(150);
       $("approveBtn").click();
@@ -81,10 +88,7 @@
       assert(/Applied/.test(document.querySelector("#toast .toast-text").textContent), "no applied toast");
       document.querySelector("#toast .undo-btn").click();
       await wait(700);
-      assert(
-        $("statsText").textContent === before,
-        `stats not reverted: "${$("statsText").textContent}" vs "${before}"`
-      );
+      assert(counts() === before, `counters not reverted: "${counts()}" vs "${before}"`);
     });
 
     await t("chat drawer toggles both ways", async () => {

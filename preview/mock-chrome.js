@@ -116,6 +116,8 @@
   addTab("Figma – Q3 design review", "https://figma.com/file/q3-review");
   addTab("Notion – Meeting notes", "https://notion.so/meeting-notes");
   addTab("Google Docs – Draft blog post", "https://docs.google.com/document/d/1");
+  // a tab never activated since browser restart: url empty, pendingUrl set
+  demoTabs.push({ id: ++tabId, windowId: 1, title: "Sleeping – restored tab", url: "", pendingUrl: "https://sleeping.example.com/article", pinned: false });
 
   window.chrome = {
     storage: { local: makeArea(store.local), session: makeArea(store.session) },

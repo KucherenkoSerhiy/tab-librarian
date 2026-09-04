@@ -1,0 +1,23 @@
+{
+  "name": "tab-sorter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Chat-driven tab & bookmark sorter extension for Chrome/Brave (BYOK, Anthropic)",
+  "scripts": {
+    "dev": "vite build --watch",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "preview:setup": "node preview/make-preview.mjs",
+    "build:firefox": "npm run build && node scripts/make-firefox.mjs",
+    "package": "npm run build && powershell -NoProfile -Command \"Compress-Archive -Path dist/* -DestinationPath ai-smart-tab-manager.zip -Force\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.123.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.2.8",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}

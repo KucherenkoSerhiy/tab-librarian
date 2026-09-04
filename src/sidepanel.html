@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Smart Tab Manager</title>
+  <link rel="stylesheet" href="./sidepanel/styles.css" />
+</head>
+<body>
+
+  <!-- ============ HOME ============ -->
+  <div id="view-home" class="view">
+    <header class="bar">
+      <h1>AI Smart Tab Manager</h1>
+      <span id="statsText" class="bar-stats"></span>
+      <button id="optionsBtn" class="icon-btn" title="Options" aria-label="Options">⚙</button>
+    </header>
+    <div class="home-body">
+      <div class="toolbar">
+        <input type="search" id="searchInput" placeholder="🔎 Search tabs &amp; bookmarks…" autocomplete="off" />
+        <button id="startSortBtn" class="btn primary" title="Sort my tabs with AI">✨ Sort</button>
+      </div>
+      <div class="statsline">
+        <button id="resumeReviewBtn" class="btn secondary small" hidden>📋 Review proposal →</button>
+        <button id="closeSortedBtn" class="btn ghost small" hidden>Close sorted tabs</button>
+      </div>
+
+      <section id="unsortedPanel" class="panel open">
+        <div class="panel-head">
+          <button class="panel-toggle" data-panel="unsortedPanel">
+            <span class="chev">▶</span>
+            <h2>Unsorted tabs</h2>
+            <span id="unsortedPanelCount" class="count"></span>
+          </button>
+        </div>
+        <div class="panel-body">
+          <p class="hint">Drag onto a folder · ⤷ move to folder · ✕ close tab</p>
+          <div id="unsorted" class="list"></div>
+        </div>
+      </section>
+
+      <section id="foldersPanel" class="panel open">
+        <div class="panel-head">
+          <button class="panel-toggle" data-panel="foldersPanel">
+            <span class="chev">▶</span>
+            <h2>Folders</h2>
+            <span id="foldersPanelCount" class="count"></span>
+          </button>
+          <button id="newFolderBtn" class="btn ghost small">＋ New</button>
+        </div>
+        <div class="panel-body">
+          <p class="hint">Drag to reorganize · ↗ open all · ＋ subfolder · ✕ delete</p>
+          <form id="newFolderForm" class="card form-card" hidden>
+            <input id="newFolderName" type="text" placeholder="Folder name" required />
+            <select id="newFolderParent"></select>
+            <div class="row">
+              <button type="submit" class="btn primary grow">Create</button>
+              <button type="button" id="cancelNewFolderBtn" class="btn ghost">Cancel</button>
+            </div>
+          </form>
+          <div id="tree" class="tree"></div>
+        </div>
+      </section>
+    </div>
+
+    <!-- docked AI chat drawer: always visible, expandable -->
+    <section id="chatDrawer" class="collapsed">
+      <div id="drawerHeader">
+        <button id="drawerToggle" title="Expand chat" aria-label="Toggle chat">
+          <span class="drawer-title">💬 AI Assistant</span>
+          <span id="drawerChevron" class="chev-v">▲</span>
+        </button>
+        <button id="newChatBtn" class="icon-btn" title="New conversation" aria-label="New conversation">⟳</button>
+      </div>
+      <div id="drawerBody">
+        <div id="messages" class="chat-scroll"></div>
+        <div id="proposalBanner" class="banner" hidden>
+          <span>📋 Proposal ready</span>
+          <button id="openReviewBtn" class="btn primary">Review →</button>
+        </div>
+        <div id="quickActions">
+          <button class="chip" data-quick="Please propose a folder structure for all my open tabs. Ask me about anything ambiguous instead of guessing.">Sort all tabs</button>
+          <button class="chip" data-quick="Sort only my unsorted tabs into the existing folders. Don't restructure existing folders or invent new ones unless nothing fits — ask me in that case.">Sort unsorted only</button>
+          <button class="chip" data-quick="Do a cleanup audit of my bookmark library: find duplicates, outdated or superseded entries, and overloaded folders. Propose removals (with reasons) and any re-organization. Ask before touching anything I placed manually.">Clean up</button>
+        </div>
+        <form id="composer">
+          <textarea id="chatInput" rows="1" placeholder="Describe how you'd like tabs organized…"></textarea>
+          <button type="submit" id="sendBtn" class="btn primary send" aria-label="Send">↑</button>
+        </form>
+      </div>
+    </section>
+    <div id="toast" hidden></div>
+  </div>
+
+  <!-- ============ REVIEW ============ -->
+  <div id="view-review" class="view" hidden>
+    <header class="bar">
+      <button id="reviewBackBtn" class="icon-btn" title="Back" aria-label="Back">←</button>
+      <h1>Review proposal</h1>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="scroll pad">
+      <p class="hint">Uncheck anything you don't want filed. Nothing is created until you apply.</p>
+      <label class="check" id="reviewControls" hidden>
+        <input type="checkbox" id="onlyChangesToggle" />
+        Only show changes since the last proposal
+      </label>
+      <div id="reviewRemovals"></div>
+      <div id="reviewQuestions"></div>
+      <div id="reviewTree" class="tree"></div>
+      <p class="hint">Applying only creates/moves bookmarks — your open tabs are never touched.</p>
+    </div>
+    <div class="apply-bar">
+      <button id="dismissBtn" class="btn ghost">Dismiss</button>
+      <button id="approveBtn" class="btn primary big grow">Apply proposal</button>
+    </div>
+  </div>
+
+  <!-- ============ SETUP / OPTIONS ============ -->
+  <div id="view-setup" class="view" hidden>
+    <header class="bar">
+      <button id="setupBackBtn" class="icon-btn" title="Back" aria-label="Back" hidden>←</button>
+      <h1 id="setupTitle">Welcome</h1>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="scroll pad">
+      <p id="setupIntro" class="lead">Let's get set up. AI Smart Tab Manager files your open tabs into nested bookmark folders you approve — with your own API key.</p>
+
+      <details class="opt-section" open>
+        <summary><h3>AI provider</h3></summary>
+        <div class="seg" id="providerSeg">
+          <button type="button" class="seg-btn" data-provider="anthropic">Anthropic</button>
+          <button type="button" class="seg-btn" data-provider="openai">OpenAI-compatible</button>
+        </div>
+        <label class="field">
+          API key
+          <input type="password" id="apiKeyInput" placeholder="sk-…" autocomplete="off" />
+          <span id="apiKeyError" class="error" hidden></span>
+        </label>
+        <label class="field" id="workspaceField">
+          Workspace ID <span class="hint-inline">(only for identity-linked keys)</span>
+          <input type="text" id="workspaceIdInput" placeholder="wrkspc_…" autocomplete="off" />
+        </label>
+        <label class="field" id="baseUrlField" hidden>
+          Base URL
+          <input type="text" id="baseUrlInput" placeholder="https://api.openai.com/v1" autocomplete="off" />
+        </label>
+        <label class="field">
+          Model
+          <input type="text" id="modelInput" list="modelList" autocomplete="off" />
+          <datalist id="modelList"></datalist>
+        </label>
+        <div class="row">
+          <button type="button" id="testKeyBtn" class="btn grow">🔌 Test connection</button>
+        </div>
+        <span id="testResult" class="hint" hidden></span>
+        <details class="faq">
+          <summary>Can I use my Claude subscription instead?</summary>
+          <p>No — subscriptions only work inside Anthropic's own apps. Use an API key from console.anthropic.com. Keys are stored only on this device and sent only to the provider you configure.</p>
+        </details>
+      </details>
+
+      <details class="opt-section" open>
+        <summary><h3>Behavior</h3></summary>
+        <label class="check">
+          <input type="checkbox" id="allWindowsInput" />
+          Include tabs from all windows
+        </label>
+      </details>
+
+      <details class="opt-section" open>
+        <summary><h3>Backup</h3></summary>
+        <label class="check">
+          <input type="checkbox" id="backupsEnabledInput" />
+          Automatic snapshots (every 3 h, kept 7 days)
+        </label>
+        <div class="row">
+          <button type="button" id="exportBackupBtn" class="btn grow">⬇ Export</button>
+          <button type="button" id="importBackupBtn" class="btn grow">⬆ Import</button>
+          <button type="button" id="clearBackupsBtn" class="btn grow">🗑 Clear</button>
+        </div>
+        <input type="file" id="importBackupFile" accept="application/json" hidden />
+        <div id="snapshotList" class="snap-list"></div>
+        <span class="hint">Snapshots live only in this extension's private storage on this device — nothing is uploaded. To inspect them: your browser's extensions page → AI Smart Tab Manager → "service worker" → Console → <code>chrome.storage.local.get('backups')</code>. Export downloads the tree as a JSON file; import merges one back and never deletes anything.</span>
+      </details>
+    </div>
+    <div class="apply-bar">
+      <button id="saveSettingsBtn" class="btn primary big grow">Save &amp; continue</button>
+    </div>
+  </div>
+
+  <script type="module" src="./sidepanel/main.ts"></script>
+</body>
+</html>

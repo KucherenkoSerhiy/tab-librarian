@@ -4,3 +4,4 @@ dist-firefox/
 *.zip
 *.log
 .DS_Store
+marketing/

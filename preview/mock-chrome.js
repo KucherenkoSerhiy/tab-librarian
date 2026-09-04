@@ -2,7 +2,14 @@
 // previewed in a plain browser tab. Loaded only by dist/preview.html — never
 // shipped with the extension.
 (() => {
-  const noopEvent = () => ({ addListener: () => {}, removeListener: () => {} });
+  const makeEvent = () => {
+    const listeners = new Set();
+    return {
+      addListener: (fn) => listeners.add(fn),
+      removeListener: (fn) => listeners.delete(fn),
+      fire: (...args) => listeners.forEach((fn) => fn(...args)),
+    };
+  };
   const clone = (x) => (x === undefined ? x : structuredClone(x));
 
   const store = {
@@ -119,6 +126,14 @@
   // a tab never activated since browser restart: url empty, pendingUrl set
   demoTabs.push({ id: ++tabId, windowId: 1, title: "Sleeping – restored tab", url: "", pendingUrl: "https://sleeping.example.com/article", pinned: false });
 
+  const bookmarkEvents = {
+    onCreated: makeEvent(),
+    onRemoved: makeEvent(),
+    onMoved: makeEvent(),
+    onChanged: makeEvent(),
+  };
+  const tabEvents = { onCreated: makeEvent(), onRemoved: makeEvent(), onUpdated: makeEvent() };
+
   window.chrome = {
     storage: { local: makeArea(store.local), session: makeArea(store.session) },
     bookmarks: {
@@ -126,13 +141,24 @@
       getChildren: async (id) => clone(nodes.get(id)?.children ?? []),
       getSubTree: async (id) => [clone(nodes.get(id))],
       getTree: async () => [clone(nodes.get("0"))],
-      create: async (info) => create(info),
+      create: async (info) => {
+        const n = create(info);
+        bookmarkEvents.onCreated.fire(n.id, n);
+        return n;
+      },
+      update: async (id, { title }) => {
+        const n = nodes.get(id);
+        if (n && title !== undefined) n.title = title;
+        bookmarkEvents.onChanged.fire(id, { title });
+        return clone(n);
+      },
       move: async (id, { parentId }) => {
         const n = nodes.get(id);
         const oldParent = nodes.get(n.parentId);
         oldParent.children = oldParent.children.filter((c) => c.id !== id);
         n.parentId = parentId;
         nodes.get(parentId).children.push(n);
+        bookmarkEvents.onMoved.fire(id, { parentId });
         return clone(n);
       },
       remove: async (id) => {
@@ -140,6 +166,7 @@
         const parent = nodes.get(n.parentId);
         parent.children = parent.children.filter((c) => c.id !== id);
         nodes.delete(id);
+        bookmarkEvents.onRemoved.fire(id, {});
       },
       removeTree: async (id) => {
         const n = nodes.get(id);
@@ -150,11 +177,9 @@
           for (const c of node.children ?? []) scrub(c);
         };
         scrub(n);
+        bookmarkEvents.onRemoved.fire(id, {});
       },
-      onCreated: noopEvent(),
-      onRemoved: noopEvent(),
-      onMoved: noopEvent(),
-      onChanged: noopEvent(),
+      ...bookmarkEvents,
     },
     tabs: {
       query: async () => clone(demoTabs),
@@ -162,7 +187,9 @@
       create: async ({ url } = {}) => {
         if (url) {
           addTab(url, url);
-          return clone(demoTabs[demoTabs.length - 1]);
+          const tab = clone(demoTabs[demoTabs.length - 1]);
+          tabEvents.onCreated.fire(tab);
+          return tab;
         }
         return {};
       },
@@ -171,12 +198,11 @@
         for (const id of list) {
           const i = demoTabs.findIndex((t) => t.id === id);
           if (i >= 0) demoTabs.splice(i, 1);
+          tabEvents.onRemoved.fire(id, {});
         }
       },
       group: async () => 1,
-      onCreated: noopEvent(),
-      onRemoved: noopEvent(),
-      onUpdated: noopEvent(),
+      ...tabEvents,
     },
     tabGroups: { update: async () => ({}) },
     windows: { update: async () => ({}) },

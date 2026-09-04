@@ -685,16 +685,18 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .removal-row .removal-reason { font-size: 12px; color: var(--text-dim); }
 .removal-head { font-weight: 700; color: var(--danger); margin: 8px 0 6px; }
 
-.snap-list { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; }
+.snap-list { display: flex; flex-direction: column; gap: 6px; max-height: 180px; overflow-y: auto; }
+.snap-list:empty { display: none; }
 .snap-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  min-height: 40px;
   font-size: 12px;
   color: var(--text-dim);
   background: var(--bg);
-  border-radius: 8px;
-  padding: 4px 6px 4px 10px;
+  border-radius: 10px;
+  padding: 6px 8px 6px 12px;
 }
 .snap-row .snap-text { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .snap-row button { min-height: 28px; padding: 0 10px; font-size: 12px; }
@@ -725,8 +727,10 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
+.opt-section > .hint { margin: 0; line-height: 1.55; }
+.opt-section .row .btn { min-height: 40px; }
 .opt-section h3 {
   margin: 0;
   font-size: 12px;

@@ -1440,6 +1440,7 @@ async function refreshAll(): Promise<void> {
   refreshQueued = true;
   tabsDirty = false; // a full refresh supersedes any pending dirty work
   bookmarksDirty = false;
+  lastFullRefresh = Date.now();
   try {
     await reconcile();
     await Promise.all([renderStats(), renderTree(), renderUnsorted()]);
@@ -1463,19 +1464,28 @@ let tabsDirty = false;
 let bookmarksDirty = false;
 let pollRunning = false;
 
-let dragInProgress = false;
-document.addEventListener("dragstart", () => (dragInProgress = true));
-document.addEventListener("dragend", () => (dragInProgress = false));
-document.addEventListener("drop", () => (dragInProgress = false));
+// Drag state must self-expire: when a drop re-renders the list, the dragged
+// row is detached before its dragend can bubble to document, so a plain
+// boolean latches true forever and silently freezes all updates.
+let dragLastSeen = 0;
+document.addEventListener("dragstart", () => (dragLastSeen = Date.now()));
+document.addEventListener("dragover", () => (dragLastSeen = Date.now()));
+document.addEventListener("dragend", () => (dragLastSeen = 0));
+document.addEventListener("drop", () => (dragLastSeen = 0));
 
 function interactionInProgress(): boolean {
-  return dragInProgress || !!document.querySelector(".inline-select, .subfolder-input, .rename-input");
+  const dragging = dragLastSeen !== 0 && Date.now() - dragLastSeen < 1500;
+  return dragging || !!document.querySelector(".inline-select, .subfolder-input, .rename-input");
 }
+
+let lastFullRefresh = 0;
 
 async function pollDirty(): Promise<void> {
   if (pollRunning || applying || currentView !== "home" || interactionInProgress()) return;
-  if (!tabsDirty && !bookmarksDirty) return;
-  const doTree = bookmarksDirty;
+  // heartbeat: even if an event was missed entirely, never stay stale > 30s
+  const heartbeatDue = Date.now() - lastFullRefresh > 30_000;
+  if (!tabsDirty && !bookmarksDirty && !heartbeatDue) return;
+  const doTree = bookmarksDirty || heartbeatDue;
   tabsDirty = false;
   bookmarksDirty = false;
   pollRunning = true;
@@ -1483,6 +1493,7 @@ async function pollDirty(): Promise<void> {
     if (doTree) {
       await reconcile();
       await renderTree();
+      lastFullRefresh = Date.now();
     }
     await Promise.all([renderStats(), renderUnsorted()]);
   } finally {

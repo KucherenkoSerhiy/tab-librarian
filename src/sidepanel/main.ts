@@ -296,6 +296,12 @@ function matchesQuery(text: string): boolean {
   return !searchQuery || text.toLowerCase().includes(searchQuery.toLowerCase());
 }
 
+/** Option label with tree indentation — folders read as a hierarchy, not paths. */
+function folderOptionLabel(path: string[]): string {
+  const depth = path.length - 1;
+  return depth === 0 ? path[0]! : `${"   ".repeat(depth)}└ ${path[path.length - 1]}`;
+}
+
 function makeFolderSelect(
   folders: { id: string; path: string[] }[],
   onPick: (folderId: string) => void
@@ -309,13 +315,26 @@ function makeFolderSelect(
   for (const folder of folders) {
     const opt = document.createElement("option");
     opt.value = folder.id;
-    opt.textContent = folder.path.join(" / ");
+    opt.textContent = folderOptionLabel(folder.path);
+    opt.title = folder.path.join(" / ");
     select.appendChild(opt);
   }
   select.addEventListener("change", () => {
     if (select.value) onPick(select.value);
   });
   return select;
+}
+
+/** Jump to the already-open tab for this URL, or open it fresh. */
+async function openOrFocusTab(url: string): Promise<void> {
+  const tabs = await getOpenTabs();
+  const existing = tabs.find((t) => normalizeUrl(t.url) === normalizeUrl(url));
+  if (existing) {
+    await chrome.tabs.update(existing.tabId, { active: true });
+    await chrome.windows.update(existing.windowId, { focused: true });
+  } else {
+    await chrome.tabs.create({ url, active: true });
+  }
 }
 
 /** Toggle an inline folder select right after `anchor`; only one open at a time. */
@@ -1037,7 +1056,15 @@ function renderReview(): void {
       const text = document.createElement("span");
       text.textContent = tab.title || tab.url;
       text.title = tab.url;
-      lbl.append(cb, makeIcon(tab.url, 18), text);
+      const icon = makeIcon(tab.url, 18);
+      icon.classList.add("clickable-icon");
+      icon.title = "Open this tab";
+      icon.addEventListener("click", (e) => {
+        e.preventDefault(); // inside the label — don't toggle the checkbox
+        e.stopPropagation();
+        void openOrFocusTab(tab.url);
+      });
+      lbl.append(cb, icon, text);
       if (base && status !== "same") {
         const badge = document.createElement("span");
         badge.className = `diff-badge ${status}`;
@@ -1121,7 +1148,8 @@ function renderReview(): void {
       const title = document.createElement("div");
       title.className = "removal-title";
       title.textContent = removal.url;
-      title.title = removal.url;
+      title.title = "Open this tab";
+      title.addEventListener("click", () => void openOrFocusTab(removal.url));
       const reason = document.createElement("div");
       reason.className = "removal-reason";
       reason.textContent = removal.reason;
@@ -1142,6 +1170,8 @@ function renderReview(): void {
     const url = document.createElement("div");
     url.className = "q-url";
     url.textContent = q.url;
+    url.title = "Open this tab";
+    url.addEventListener("click", () => void openOrFocusTab(q.url));
 
     const controls = document.createElement("div");
     controls.className = "q-controls";
@@ -1476,7 +1506,8 @@ async function populateParentSelect(): Promise<void> {
   for (const folder of await listFolders()) {
     const opt = document.createElement("option");
     opt.value = folder.id;
-    opt.textContent = folder.path.join(" / ");
+    opt.textContent = folderOptionLabel(folder.path);
+    opt.title = folder.path.join(" / ");
     select.appendChild(opt);
   }
 }

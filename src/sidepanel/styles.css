@@ -654,7 +654,12 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   box-shadow: var(--shadow);
   padding: 10px 12px;
 }
-.question .q-url { color: var(--text-dim); font-size: 12px; word-break: break-all; margin-top: 3px; }
+.question .q-url { color: var(--text-dim); font-size: 12px; word-break: break-all; margin-top: 3px; cursor: pointer; }
+.question .q-url:hover { color: var(--accent); text-decoration: underline; }
+.removal-row .removal-title { cursor: pointer; }
+.removal-row .removal-title:hover { color: var(--accent); text-decoration: underline; }
+.clickable-icon { cursor: pointer; }
+.clickable-icon:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
 .q-controls { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
 .answer-input { flex: 1; min-width: 0; min-height: 38px; padding: 6px 10px; font-size: 13px; }
 #sendAnswersBtn { align-self: flex-start; }

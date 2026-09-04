@@ -188,6 +188,16 @@
       );
     });
 
+    await t("folder picker renders as an indented tree", async () => {
+      document.querySelector("#unsorted .tab-row .add-btn").click();
+      await wait(150);
+      const select = document.querySelector(".inline-select");
+      assert(select, "no folder select opened");
+      const nested = [...select.options].find((o) => o.textContent.includes("└"));
+      assert(nested, "no indented nested option found");
+      select.remove();
+    });
+
     await t("folder rename input appears on double-click", async () => {
       const name = document.querySelector("#tree .folder-name");
       name.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));

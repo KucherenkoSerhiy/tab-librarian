@@ -426,6 +426,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   white-space: pre;
   overflow: hidden;
   text-overflow: ellipsis;
+  flex-shrink: 0; /* long lists must scroll, not squish items into slivers */
 }
 .picker-item:hover, .picker-item.active { background: var(--accent-soft); color: var(--accent); }
 

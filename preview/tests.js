@@ -246,6 +246,32 @@
       await wait(300);
     });
 
+    await t("picker items keep full height with many folders (no flex squish)", async () => {
+      // inflate the tree so the list exceeds its max-height
+      const root = (await chrome.bookmarks.getChildren("2")).find((n) => !n.url);
+      for (let i = 0; i < 15; i++) {
+        await chrome.bookmarks.create({ parentId: root.id, title: `Bulk folder ${i}` });
+      }
+      await wait(2600); // let the poll consume the dirty flags from folder creation
+      // deterministic re-render so the row we click can't be replaced mid-test
+      const search = $("searchInput");
+      search.value = "zz";
+      search.dispatchEvent(new Event("input"));
+      await wait(250);
+      search.value = "";
+      search.dispatchEvent(new Event("input"));
+      await wait(300);
+      // flat (ungrouped) row — a collapsed domain group isn't clickable in real UI
+      document.querySelector("#unsorted > .tab-row .add-btn")?.click();
+      await wait(500); // let layout settle before measuring
+      const items = [...document.querySelectorAll(".folder-picker .picker-item")];
+      assert(items.length >= 15, `expected many items, got ${items.length}`);
+      const heights = items.map((i) => i.getBoundingClientRect().height);
+      const short = heights.filter((h) => h < 28);
+      assert(short.length === 0, `squished heights: ${heights.map((h) => Math.round(h)).join(",")}`);
+      document.querySelector(".folder-picker")?.remove();
+    });
+
     const passed = results.filter((r) => r.ok).length;
     const box = document.createElement("div");
     box.id = "test-results";

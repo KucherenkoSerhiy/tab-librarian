@@ -25,6 +25,13 @@
       assert(/^\d+$/.test($("foldersPanelCount").textContent), "managed counter empty");
     });
 
+    await t("local file tabs are listed with a 'local file' label", async () => {
+      const rows = [...document.querySelectorAll("#unsorted .tab-row")];
+      const fileRow = rows.find((r) => r.textContent.includes("stretch-guide.html"));
+      assert(fileRow, "file:// tab missing from unmanaged list");
+      assert(fileRow.textContent.includes("local file"), "no 'local file' domain label");
+    });
+
     await t("sleeping tabs (pendingUrl only) are counted", async () => {
       const titles = [...document.querySelectorAll("#unsorted .tab-title")].map((e) => e.textContent);
       assert(titles.some((t) => t.includes("Sleeping – restored tab")), "pendingUrl tab missing");

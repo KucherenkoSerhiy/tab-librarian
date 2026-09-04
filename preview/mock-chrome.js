@@ -125,6 +125,9 @@
   addTab("Google Docs – Draft blog post", "https://docs.google.com/document/d/1");
   // a tab never activated since browser restart: url empty, pendingUrl set
   demoTabs.push({ id: ++tabId, windowId: 1, title: "Sleeping – restored tab", url: "", pendingUrl: "https://sleeping.example.com/article", pinned: false });
+  // local file tabs (job docs, guides opened from disk)
+  addTab("stretch-guide.html", "file:///C:/repos/job-radar/stretch-guide.html");
+  addTab("Job Search Documents", "file:///C:/repos/job-radar/job-search/job-search-viewer.html");
 
   const bookmarkEvents = {
     onCreated: makeEvent(),

@@ -7,6 +7,7 @@ const SETTINGS_DEFAULTS: Settings = {
   baseUrl: "https://api.openai.com/v1",
   model: "claude-sonnet-5",
   includeAllWindows: true,
+  includeLocalFiles: true,
   backupsEnabled: true,
 };
 

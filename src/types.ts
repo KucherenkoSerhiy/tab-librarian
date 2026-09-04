@@ -9,6 +9,7 @@ export interface Settings {
   baseUrl: string;
   model: string;
   includeAllWindows: boolean;
+  includeLocalFiles: boolean;
   backupsEnabled: boolean;
 }
 

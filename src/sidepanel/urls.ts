@@ -11,7 +11,14 @@ export function normalizeUrl(raw: string): string {
   }
 }
 
-/** Only http(s) pages are sortable — skips chrome://, about:, extension pages, etc. */
+/** Web pages and local files are sortable — skips chrome://, about:, extension pages, etc. */
 export function isSortableUrl(url: string | undefined): url is string {
-  return !!url && (url.startsWith("http://") || url.startsWith("https://"));
+  return (
+    !!url &&
+    (url.startsWith("http://") || url.startsWith("https://") || url.startsWith("file://"))
+  );
+}
+
+export function isLocalFileUrl(url: string): boolean {
+  return url.startsWith("file://");
 }

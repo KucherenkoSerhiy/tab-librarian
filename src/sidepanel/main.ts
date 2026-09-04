@@ -36,7 +36,7 @@ import {
   saveSettings,
   setSessionState,
 } from "./storage";
-import { isSortableUrl, normalizeUrl } from "./urls";
+import { isLocalFileUrl, isSortableUrl, normalizeUrl } from "./urls";
 
 // ---------- state ----------
 
@@ -133,7 +133,12 @@ async function getOpenTabs(): Promise<OpenTabInfo[]> {
       // address in pendingUrl — without this they'd be invisible to the panel
       url: t.url || t.pendingUrl || "",
     }))
-    .filter(({ tab, url }) => isSortableUrl(url) && tab.id !== undefined)
+    .filter(
+      ({ tab, url }) =>
+        isSortableUrl(url) &&
+        tab.id !== undefined &&
+        (settings.includeLocalFiles || !isLocalFileUrl(url))
+    )
     .map(({ tab, url }) => ({
       tabId: tab.id!,
       windowId: tab.windowId,
@@ -218,7 +223,9 @@ function proposalMap(proposal: Proposal): Record<string, string> {
 
 function domainOf(url: string): string {
   try {
-    return new URL(url).hostname.replace(/^www\./, "");
+    const u = new URL(url);
+    if (u.protocol === "file:") return "local file";
+    return u.hostname.replace(/^www\./, "");
   } catch {
     return url;
   }
@@ -325,6 +332,21 @@ function makeFolderSelect(
   return select;
 }
 
+/** Undo helper for closed tabs; local files can be blocked by the browser. */
+async function reopenTabs(urls: string[]): Promise<void> {
+  let blocked = 0;
+  for (const url of urls) {
+    try {
+      await chrome.tabs.create({ url, active: false });
+    } catch {
+      blocked++;
+    }
+  }
+  if (blocked) {
+    showToast(`${blocked} local file tab(s) couldn't reopen — needs “Allow access to file URLs”`);
+  }
+}
+
 /** Jump to the already-open tab for this URL, or open it fresh. */
 async function openOrFocusTab(url: string): Promise<void> {
   const tabs = await getOpenTabs();
@@ -332,8 +354,16 @@ async function openOrFocusTab(url: string): Promise<void> {
   if (existing) {
     await chrome.tabs.update(existing.tabId, { active: true });
     await chrome.windows.update(existing.windowId, { focused: true });
-  } else {
+    return;
+  }
+  try {
     await chrome.tabs.create({ url, active: true });
+  } catch (err) {
+    showToast(
+      isLocalFileUrl(url)
+        ? "The browser blocks extensions from opening local files — enable “Allow access to file URLs” on the extension's details page."
+        : `Couldn't open tab: ${err instanceof Error ? err.message : err}`
+    );
   }
 }
 
@@ -545,9 +575,9 @@ function makeTabRow(tab: UnsortedEntry, folders: { id: string; path: string[] }[
   close.addEventListener("click", async () => {
     const count = tab.tabIds.length;
     await chrome.tabs.remove(tab.tabIds);
-    showToast(count > 1 ? `Closed ${count} duplicate tabs` : "Tab closed", async () => {
-      for (let i = 0; i < count; i++) await chrome.tabs.create({ url: tab.url, active: false });
-    });
+    showToast(count > 1 ? `Closed ${count} duplicate tabs` : "Tab closed", () =>
+      reopenTabs(Array.from({ length: count }, () => tab.url))
+    );
     await refreshAll();
   });
   row.appendChild(close);
@@ -616,9 +646,7 @@ function makeDomainGroup(
     const urls = tabs.flatMap((t) => t.tabIds.map(() => t.url));
     void (async () => {
       await chrome.tabs.remove(tabs.flatMap((t) => t.tabIds));
-      showToast(`Closed ${urls.length} tabs`, async () => {
-        for (const url of urls) await chrome.tabs.create({ url, active: false });
-      });
+      showToast(`Closed ${urls.length} tabs`, () => reopenTabs(urls));
       await refreshAll();
     })();
   });
@@ -839,8 +867,11 @@ async function renderTree(): Promise<void> {
       openAll.addEventListener("click", (e) => {
         stopThrough(e);
         void (async () => {
-          const tabIds = await openFolderTabs(node.id);
-          showToast(`Opened ${tabIds.length} tabs`, async () => {
+          const { tabIds, blocked } = await openFolderTabs(node.id);
+          const note = blocked
+            ? `Opened ${tabIds.length} tabs · ${blocked} local file(s) blocked (needs “Allow access to file URLs”)`
+            : `Opened ${tabIds.length} tabs`;
+          showToast(note, async () => {
             await chrome.tabs.remove(tabIds).catch(() => {});
           });
           await refreshAll();
@@ -1343,6 +1374,7 @@ function settingsFromForm(): Settings {
     baseUrl: ($("baseUrlInput") as HTMLInputElement).value.trim() || "https://api.openai.com/v1",
     model: ($("modelInput") as HTMLInputElement).value.trim(),
     includeAllWindows: ($("allWindowsInput") as HTMLInputElement).checked,
+    includeLocalFiles: ($("includeLocalFilesInput") as HTMLInputElement).checked,
     backupsEnabled: ($("backupsEnabledInput") as HTMLInputElement).checked,
   };
 }
@@ -1395,6 +1427,7 @@ function openSetup(asOptions: boolean): void {
     ($("baseUrlInput") as HTMLInputElement).value = s.baseUrl;
     ($("modelInput") as HTMLInputElement).value = s.model;
     ($("allWindowsInput") as HTMLInputElement).checked = s.includeAllWindows;
+    ($("includeLocalFilesInput") as HTMLInputElement).checked = s.includeLocalFiles;
     ($("backupsEnabledInput") as HTMLInputElement).checked = s.backupsEnabled;
   });
   void snapshotCount().then((n) => {
@@ -1649,9 +1682,9 @@ async function init(): Promise<void> {
     if (!sorted.length) return;
     const urls = sorted.map((t) => t.url);
     await chrome.tabs.remove(sorted.map((t) => t.tabId));
-    showToast(`Closed ${sorted.length} sorted tab${sorted.length === 1 ? "" : "s"}`, async () => {
-      for (const url of urls) await chrome.tabs.create({ url, active: false });
-    });
+    showToast(`Closed ${sorted.length} sorted tab${sorted.length === 1 ? "" : "s"}`, () =>
+      reopenTabs(urls)
+    );
     await refreshAll();
   });
   $("openReviewBtn").addEventListener("click", () => {

@@ -437,8 +437,14 @@ export async function restoreDeletedFolder(data: DeletedFolderData): Promise<voi
   await reconcile();
 }
 
-/** Open every bookmark in a folder (recursively) as background tabs; returns the new tab ids. */
-export async function openFolderTabs(folderId: string): Promise<number[]> {
+/**
+ * Open every bookmark in a folder (recursively) as background tabs.
+ * file:// bookmarks are blocked unless the user granted file access — those
+ * are counted in `blocked` instead of failing the whole batch.
+ */
+export async function openFolderTabs(
+  folderId: string
+): Promise<{ tabIds: number[]; blocked: number }> {
   const [subtree] = await chrome.bookmarks.getSubTree(folderId);
   const urls: string[] = [];
   const collect = (node: BookmarkNode) => {
@@ -449,11 +455,16 @@ export async function openFolderTabs(folderId: string): Promise<number[]> {
   };
   if (subtree) collect(subtree);
   const tabIds: number[] = [];
+  let blocked = 0;
   for (const url of urls) {
-    const tab = await chrome.tabs.create({ url, active: false });
-    if (tab.id !== undefined) tabIds.push(tab.id);
+    try {
+      const tab = await chrome.tabs.create({ url, active: false });
+      if (tab.id !== undefined) tabIds.push(tab.id);
+    } catch {
+      blocked++;
+    }
   }
-  return tabIds;
+  return { tabIds, blocked };
 }
 
 async function folderPathOf(folderId: string | undefined): Promise<string> {

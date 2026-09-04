@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Tab Librarian",
-  "version": "0.3.0",
+  "version": "1.0.0",
   "description": "Your AI librarian for tabs: files 100+ open tabs into a tidy bookmark library you approve, so you can close them without fear. BYOK.",
   "icons": {
     "16": "icons/icon16.png",

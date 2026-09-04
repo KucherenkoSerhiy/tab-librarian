@@ -335,6 +335,30 @@ function makeFolderSelect(
   return select;
 }
 
+/**
+ * Closing every tab in a window closes the window — and the browser, if it was
+ * the last one. Spawn a New Tab in any window we're about to empty first.
+ */
+async function closeTabsSafely(tabIds: number[]): Promise<void> {
+  if (!tabIds.length) return;
+  const closing = new Set(tabIds);
+  const allTabs = await chrome.tabs.query({});
+  const byWindow = new Map<number, { total: number; toClose: number }>();
+  for (const tab of allTabs) {
+    if (tab.id === undefined) continue;
+    const stat = byWindow.get(tab.windowId) ?? { total: 0, toClose: 0 };
+    stat.total++;
+    if (closing.has(tab.id)) stat.toClose++;
+    byWindow.set(tab.windowId, stat);
+  }
+  for (const [windowId, stat] of byWindow) {
+    if (stat.total > 0 && stat.toClose >= stat.total) {
+      await chrome.tabs.create({ windowId, active: true }).catch(() => {});
+    }
+  }
+  await chrome.tabs.remove(tabIds);
+}
+
 /** Undo helper for closed tabs; local files can be blocked by the browser. */
 async function reopenTabs(urls: string[]): Promise<void> {
   let blocked = 0;
@@ -577,7 +601,7 @@ function makeTabRow(tab: UnsortedEntry, folders: { id: string; path: string[] }[
   close.textContent = "✕";
   close.addEventListener("click", async () => {
     const count = tab.tabIds.length;
-    await chrome.tabs.remove(tab.tabIds);
+    await closeTabsSafely(tab.tabIds);
     showToast(count > 1 ? `Closed ${count} duplicate tabs` : "Tab closed", () =>
       reopenTabs(Array.from({ length: count }, () => tab.url))
     );
@@ -648,7 +672,7 @@ function makeDomainGroup(
     }
     const urls = tabs.flatMap((t) => t.tabIds.map(() => t.url));
     void (async () => {
-      await chrome.tabs.remove(tabs.flatMap((t) => t.tabIds));
+      await closeTabsSafely(tabs.flatMap((t) => t.tabIds));
       showToast(`Closed ${urls.length} tabs`, () => reopenTabs(urls));
       await refreshAll();
     })();
@@ -876,7 +900,7 @@ async function renderTree(): Promise<void> {
             : `Opened ${tabIds.length} tabs`;
           showToast(note, async () => {
             suppressCloseTrackingUntil = Date.now() + 3000; // undoing an open-all keeps bookmarks
-            await chrome.tabs.remove(tabIds).catch(() => {});
+            await closeTabsSafely(tabIds).catch(() => {});
           });
           await refreshAll();
         })();
@@ -1777,7 +1801,7 @@ async function init(): Promise<void> {
     if (!sorted.length) return;
     const urls = sorted.map((t) => t.url);
     suppressCloseTrackingUntil = Date.now() + 3000; // bulk close = "keep the bookmarks"
-    await chrome.tabs.remove(sorted.map((t) => t.tabId));
+    await closeTabsSafely(sorted.map((t) => t.tabId));
     showToast(`Closed ${sorted.length} sorted tab${sorted.length === 1 ? "" : "s"}`, () =>
       reopenTabs(urls)
     );

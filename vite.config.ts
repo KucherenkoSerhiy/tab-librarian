@@ -6,6 +6,7 @@ const r = (p: string) => fileURLToPath(new URL(p, import.meta.url));
 export default defineConfig({
   root: "src",
   publicDir: r("public"),
+  preview: { cors: true },
   build: {
     outDir: r("dist"),
     emptyOutDir: true,

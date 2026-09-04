@@ -115,6 +115,34 @@ function setPanel(id: "unsortedPanel" | "foldersPanel", open: boolean): void {
   void setSessionState(id, open);
 }
 
+// ---------- theme ----------
+
+function effectiveTheme(): "light" | "dark" {
+  const chosen = document.documentElement.dataset.theme;
+  if (chosen === "light" || chosen === "dark") return chosen;
+  return matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+function updateThemeButton(): void {
+  const btn = $("themeBtn");
+  const current = effectiveTheme();
+  btn.textContent = current === "dark" ? "☀️" : "🌙";
+  btn.title = current === "dark" ? "Switch to light mode" : "Switch to dark mode";
+}
+
+async function initTheme(): Promise<void> {
+  const { theme } = await chrome.storage.local.get("theme");
+  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  updateThemeButton();
+}
+
+function toggleTheme(): void {
+  const next = effectiveTheme() === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  void chrome.storage.local.set({ theme: next });
+  updateThemeButton();
+}
+
 function scrollChatToBottom(): void {
   const messages = $("messages");
   messages.scrollTop = messages.scrollHeight;
@@ -1797,6 +1825,8 @@ async function pollDirty(): Promise<void> {
 // ---------- init ----------
 
 async function init(): Promise<void> {
+  await initTheme();
+  $("themeBtn").addEventListener("click", toggleTheme);
   await ensureManagedRoot();
 
   apiHistory = (await getSessionState<ApiMessage[]>("apiHistory")) ?? [];

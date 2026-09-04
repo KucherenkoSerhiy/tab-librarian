@@ -236,6 +236,19 @@
       picker.remove();
     });
 
+    await t("theme toggle flips light/dark and persists choice", async () => {
+      const before = document.documentElement.dataset.theme ?? "system";
+      $("themeBtn").click();
+      await wait(100);
+      const after = document.documentElement.dataset.theme;
+      assert(after === "dark" || after === "light", "no data-theme set after toggle");
+      assert(after !== before, "theme did not change");
+      const { theme } = await chrome.storage.local.get("theme");
+      assert(theme === after, "theme choice not persisted");
+      $("themeBtn").click(); // restore
+      await wait(100);
+    });
+
     await t("folder rename input appears on double-click", async () => {
       const name = document.querySelector("#tree .folder-name");
       name.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));

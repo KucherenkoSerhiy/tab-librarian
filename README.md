@@ -48,6 +48,12 @@ Every destructive or filing action (file, unfile, close tab(s), delete folder, a
 
 The apply step is a **diff, not a rebuild**: it creates missing folders/bookmarks, moves only AI-placed items, and deletes only what you approved in the removals section. Rendering is event-driven with a 2-second dirty-flag poll and a 30-second heartbeat — updates never interrupt a drag, an open picker, or a rename, and can never wedge. Tabs asleep since a browser restart (empty `url`, address in `pendingUrl`) are counted like any other.
 
+## Install
+
+**Chrome / Brave / Edge:** [Tab Librarian on the Chrome Web Store](https://chromewebstore.google.com/detail/tab-librarian/hakiameklkpoediloonghmilhhlpjejd) — one click, auto-updates.
+
+Firefox: no AMO listing yet; build it yourself with `npm run build:firefox` (see Development).
+
 ## Development
 
 ```bash

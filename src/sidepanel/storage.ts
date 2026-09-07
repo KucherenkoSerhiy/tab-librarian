@@ -9,6 +9,9 @@ const SETTINGS_DEFAULTS: Settings = {
   includeAllWindows: true,
   includeLocalFiles: true,
   backupsEnabled: true,
+  previewOutgoing: true,
+  stripQueryStrings: true,
+  excludedDomains: "",
 };
 
 export async function getSettings(): Promise<Settings> {

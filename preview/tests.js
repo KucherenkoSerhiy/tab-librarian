@@ -285,6 +285,75 @@
       document.querySelector(".folder-picker")?.remove();
     });
 
+    await t("find strip is hidden until the AI is asked", async () => {
+      assert($("findStrip").hidden, "find strip visible without a query");
+    });
+
+    await t("privacy: excluded domain shows a lock and is kept out of the payload", async () => {
+      const { settings } = await chrome.storage.local.get("settings");
+      await chrome.storage.local.set({ settings: { ...settings, excludedDomains: "bank.example.com" } });
+      const s = $("searchInput");
+      s.value = "zz";
+      s.dispatchEvent(new Event("input"));
+      await wait(250);
+      s.value = "";
+      s.dispatchEvent(new Event("input"));
+      await wait(300);
+      const bankRow = [...document.querySelectorAll("#unsorted .tab-row")].find((r) => r.textContent.includes("Bank"));
+      assert(bankRow, "bank tab not listed");
+      assert(bankRow.querySelector(".lock"), "no lock marker on excluded-domain tab");
+    });
+
+    await t("privacy: preview shows stripped URLs, omits excluded domain, cancel sends nothing", async () => {
+      const before = document.querySelectorAll("#messages .msg, #messages > *").length;
+      $("chatInput").value = "sort my tabs please";
+      $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
+      await wait(600);
+      assert(!$("view-outgoing").hidden, "outgoing preview did not open");
+      const urls = [...document.querySelectorAll("#view-outgoing .sent-url")].map((e) => e.textContent);
+      assert(urls.length > 0, "no outgoing rows");
+      assert(urls.every((u) => !u.includes("?") && !u.includes("SECRET")), `query string leaked: ${urls.find((u) => u.includes("?"))}`);
+      assert(!$("view-outgoing").textContent.includes("bank.example.com"), "excluded domain present in preview");
+      assert($("outgoingSummary").textContent.includes("kept back"), "summary does not mention kept-back items");
+      $("outgoingCancelBtn").click();
+      await wait(300);
+      assert(!$("view-home").hidden, "did not return home after cancel");
+      const after = document.querySelectorAll("#messages .msg, #messages > *").length;
+      assert(after === before, "a message was added despite cancel");
+    });
+
+    await t("privacy: skipping an item in the preview removes it from the next preview", async () => {
+      $("chatInput").value = "sort my tabs please";
+      $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
+      await wait(600);
+      const rowsBefore = document.querySelectorAll("#outgoingTabs .tab-row").length;
+      document.querySelector("#outgoingTabs .tab-row .remove-btn").click();
+      await wait(500);
+      const rowsAfter = document.querySelectorAll("#outgoingTabs .tab-row").length;
+      assert(rowsAfter === rowsBefore - 1, `expected ${rowsBefore - 1} rows, got ${rowsAfter}`);
+      $("outgoingCancelBtn").click();
+      await wait(300);
+    });
+
+    await t("review shows the folder note (why grouped)", async () => {
+      $("resumeReviewBtn").click();
+      await wait(300);
+      const note = [...document.querySelectorAll("#reviewTree .folder-note")].map((e) => e.textContent);
+      assert(note.some((n) => n.includes("Client A engagement")), `no folder note; got ${JSON.stringify(note)}`);
+      $("reviewBackBtn").click();
+      await wait(300);
+    });
+
+    await t("options: Privacy section carries the settings", async () => {
+      $("optionsBtn").click();
+      await wait(300);
+      assert($("previewOutgoingInput").checked, "preview toggle not on by default");
+      assert($("stripQueryInput").checked, "strip toggle not on by default");
+      assert($("excludedDomainsInput").value.includes("bank.example.com"), "excluded domains not shown");
+      $("setupBackBtn").click();
+      await wait(300);
+    });
+
     const passed = results.filter((r) => r.ok).length;
     const box = document.createElement("div");
     box.id = "test-results";

@@ -77,6 +77,20 @@ npm run build && npm run preview:setup && npm run preview
 
 Other scripts: `npm run build:firefox` produces `dist-firefox/` (Firefox port: `sidebar_action` + event-page manifest — functional, lightly tested; load via about:debugging); `npm run package` zips `dist/` for the Web Store. `PRIVACY.md` is the store-ready privacy policy (hosted at https://kucherenkoserhiy.github.io/tab-librarian/PRIVACY).
 
+## What leaves your browser, and how to control it (v1.1)
+
+Every AI call carries the titles and URLs of your open tabs plus your library (bookmark titles, URLs, folder names). Three controls in **Options → Privacy** decide what that payload contains:
+
+- **Preview before sending** (on by default) — a "Before sending" step lists every title and URL exactly as it will be sent, with the provider host. ✕ skips an item for the current conversation; 🔒 adds its domain to the exclusion list. The step only reappears when the set of items changes, so refining a proposal in chat doesn't nag.
+- **Strip query strings** (on by default) — `?session=…`, `?q=…` and `#fragments` never leave the browser. Bookmarks keep the full URL locally; the model sees the path and the title, and its answers are mapped back to the real tabs.
+- **Excluded domains** — tabs and bookmarks on those hosts (subdomains included) stay in the panel marked 🔒, can still be filed by hand, and are never sent.
+
+## Finding things later (v1.1)
+
+The search box filters titles and URLs as you type. Press **Enter** to ask the AI instead: describe what you're looking for in plain words ("that article about vector database costs") and the tree narrows to the matches, each with a one-line reason. Same privacy rules apply — the library is sent through the same preview.
+
+Every proposed folder in Review also carries a one-line note from the model on why those tabs are grouped there.
+
 ## Chrome Web Store review notes
 
 Permissions and their justifications:

@@ -17,8 +17,12 @@
     </header>
     <div class="home-body">
       <div class="toolbar">
-        <input type="search" id="searchInput" placeholder="🔎 Search tabs &amp; bookmarks…" autocomplete="off" />
+        <input type="search" id="searchInput" placeholder="🔎 Search… (Enter asks the AI)" autocomplete="off" />
         <button id="startSortBtn" class="btn primary" title="Sort my tabs with AI">✨ Sort</button>
+      </div>
+      <div id="findStrip" class="find-strip" hidden>
+        <span id="findText"></span>
+        <button id="findClearBtn" class="icon-btn" title="Clear results" aria-label="Clear results">✕</button>
       </div>
       <div class="statsline">
         <button id="resumeReviewBtn" class="btn secondary small" hidden>📋 Review proposal →</button>
@@ -91,6 +95,33 @@
       </div>
     </section>
     <div id="toast" hidden></div>
+  </div>
+
+  <!-- ============ OUTGOING (privacy preview) ============ -->
+  <div id="view-outgoing" class="view" hidden>
+    <header class="bar">
+      <button id="outgoingBackBtn" class="icon-btn" title="Cancel" aria-label="Cancel">←</button>
+      <h1>Before sending</h1>
+      <span class="bar-spacer"></span>
+    </header>
+    <div class="scroll pad">
+      <p id="outgoingSummary" class="lead"></p>
+      <p class="hint">Exactly what leaves your browser, as it will be sent. ✕ skips an item for this conversation · 🔒 excludes its whole domain.</p>
+      <div id="outgoingTabs" class="list"></div>
+      <details id="outgoingLibrary" class="opt-section">
+        <summary><h3 id="outgoingLibraryTitle">Library</h3></summary>
+        <div id="outgoingBookmarks" class="list"></div>
+      </details>
+      <p class="hint">Folder names are sent too. Adjust what's shared in Options → Privacy.</p>
+      <label class="check">
+        <input type="checkbox" id="outgoingAskAgain" />
+        Show this again whenever the list changes
+      </label>
+    </div>
+    <div class="apply-bar">
+      <button id="outgoingCancelBtn" class="btn ghost">Cancel</button>
+      <button id="outgoingSendBtn" class="btn primary big grow">Send</button>
+    </div>
   </div>
 
   <!-- ============ REVIEW ============ -->
@@ -171,6 +202,23 @@
           <input type="checkbox" id="includeLocalFilesInput" />
           Include local files (file://)
         </label>
+      </details>
+
+      <details class="opt-section" open>
+        <summary><h3>Privacy</h3></summary>
+        <label class="check">
+          <input type="checkbox" id="previewOutgoingInput" />
+          Show what will be sent before each new send
+        </label>
+        <label class="check">
+          <input type="checkbox" id="stripQueryInput" />
+          Strip query strings from URLs (<code>?id=…</code> and <code>#…</code> never leave the browser)
+        </label>
+        <label class="field">
+          Never send these domains <span class="hint-inline">(one per line, subdomains included)</span>
+          <textarea id="excludedDomainsInput" rows="3" placeholder="bank.example.com&#10;mail.google.com"></textarea>
+        </label>
+        <span class="hint">Tabs and bookmarks on excluded domains stay in the panel (🔒) and can be filed by hand — the AI never sees them.</span>
       </details>
 
       <details class="opt-section" open>

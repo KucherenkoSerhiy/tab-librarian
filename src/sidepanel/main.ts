@@ -26,7 +26,16 @@ import {
   snapshotCount,
   snapshotNow,
 } from "./backup";
-import { friendlyApiError, isAbortError, runChatTurn, testApiKey, type ApiMessage } from "./llm";
+import { friendlyApiError, isAbortError, runChatTurn, runFindTurn, testApiKey, type ApiMessage } from "./llm";
+import {
+  buildOutgoingMap,
+  isExcludedUrl,
+  mapProposalBack,
+  outgoingKey,
+  parseExcludedDomains,
+  realUrlOf,
+  type OutgoingMap,
+} from "./privacy";
 import {
   clearSessionState,
   getPlacements,
@@ -40,7 +49,7 @@ import { isLocalFileUrl, isSortableUrl, normalizeUrl } from "./urls";
 
 // ---------- state ----------
 
-type View = "home" | "review" | "setup";
+type View = "home" | "review" | "setup" | "outgoing";
 
 let currentView: View = "home";
 let apiHistory: ApiMessage[] = [];
@@ -53,6 +62,13 @@ let busy = false;
 let applying = false;
 let firstRun = false;
 let searchQuery = "";
+/** Recall results: normalized real URL -> why it matched. When set, only these URLs are shown. */
+let findFilter: Map<string, string> | null = null;
+let findBusy = false;
+/** URLs the user skipped in the "before sending" preview (this conversation only). */
+let sessionExcludedUrls = new Set<string>();
+/** Fingerprint of the last outgoing set the user approved; no re-ask while it's unchanged. */
+let approvedOutgoingKey = "";
 // Expansion state survives re-renders — this is what keeps the tree from
 // collapsing every time something updates.
 const openFolders = new Set<string>();
@@ -90,7 +106,7 @@ const $ = <T extends HTMLElement>(id: string): T => document.getElementById(id) 
 
 function showView(view: View): void {
   currentView = view;
-  for (const v of ["home", "review", "setup"] as const) {
+  for (const v of ["home", "review", "setup", "outgoing"] as const) {
     $(`view-${v}`).hidden = v !== view;
   }
   if (view === "home") {
@@ -154,6 +170,7 @@ async function getOpenTabs(): Promise<OpenTabInfo[]> {
   const settings = await getSettings();
   const tabs = await chrome.tabs.query(settings.includeAllWindows ? {} : { currentWindow: true });
   const placements = await getPlacements();
+  const excludedDomains = parseExcludedDomains(settings.excludedDomains);
   return tabs
     .map((t) => ({
       tab: t,
@@ -176,17 +193,40 @@ async function getOpenTabs(): Promise<OpenTabInfo[]> {
         url,
         pinned: tab.pinned,
         sorted: normalizeUrl(url) in placements,
+        excluded: isExcludedUrl(url, excludedDomains) || undefined,
       };
     });
 }
 
-async function buildContextBlock(): Promise<string> {
-  const [tree, placements, removals, tabs] = await Promise.all([
+interface OutgoingItem {
+  realUrl: string;
+  sentUrl: string;
+  title: string;
+  folder?: string;
+}
+
+/** Everything a provider call will carry, after the privacy rules are applied. */
+interface Outgoing {
+  text: string;
+  tabs: OutgoingItem[];
+  bookmarks: OutgoingItem[];
+  folderCount: number;
+  excludedCount: number;
+  map: OutgoingMap;
+  key: string;
+}
+
+async function buildOutgoing(): Promise<Outgoing> {
+  const [settings, tree, placements, removals, tabs] = await Promise.all([
+    getSettings(),
     getManagedTree(),
     getPlacements(),
     getRemovals(),
     getOpenTabs(),
   ]);
+  const excludedDomains = parseExcludedDomains(settings.excludedDomains);
+  const skip = (url: string) =>
+    isExcludedUrl(url, excludedDomains) || sessionExcludedUrls.has(normalizeUrl(url));
 
   const folders: string[] = [];
   const bookmarks: {
@@ -196,9 +236,14 @@ async function buildContextBlock(): Promise<string> {
     source: string;
     addedDaysAgo?: number;
   }[] = [];
+  let excludedCount = 0;
   const walk = (node: chrome.bookmarks.BookmarkTreeNode, path: string[]) => {
     for (const child of node.children ?? []) {
       if (child.url) {
+        if (skip(child.url)) {
+          excludedCount++;
+          continue;
+        }
         const key = normalizeUrl(child.url);
         bookmarks.push({
           url: child.url,
@@ -217,24 +262,150 @@ async function buildContextBlock(): Promise<string> {
   };
   walk(tree, []);
 
-  const removedByUser = Object.entries(removals).map(([url, r]) => ({
-    url,
-    removedFromFolder: r.folderPath,
-  }));
+  const sentTabs = tabs.filter((t) => {
+    if (skip(t.url)) {
+      excludedCount++;
+      return false;
+    }
+    return true;
+  });
+  const removedByUser = Object.entries(removals)
+    .filter(([url]) => !skip(url))
+    .map(([url, r]) => ({ url, removedFromFolder: r.folderPath }));
+
+  const map = buildOutgoingMap(
+    [...sentTabs.map((t) => t.url), ...bookmarks.map((b) => b.url), ...removedByUser.map((r) => r.url)],
+    settings.stripQueryStrings
+  );
+  const sent = (url: string) => map.sentFor.get(url) ?? url;
 
   const state = {
-    openTabs: tabs.map((t) => ({
+    openTabs: sentTabs.map((t) => ({
       title: t.title,
-      url: t.url,
+      url: sent(t.url),
       sorted: t.sorted,
       pinned: t.pinned || undefined,
     })),
     existingFolders: folders,
-    existingBookmarks: bookmarks,
-    removedByUser,
+    existingBookmarks: bookmarks.map((b) => ({ ...b, url: sent(b.url) })),
+    removedByUser: removedByUser.map((r) => ({ ...r, url: sent(r.url) })),
   };
 
-  return `<CURRENT STATE>\n${JSON.stringify(state, null, 1)}\n</CURRENT STATE>`;
+  const tabItems = sentTabs.map((t) => ({ realUrl: t.url, sentUrl: sent(t.url), title: t.title }));
+  const bmItems = bookmarks.map((b) => ({ realUrl: b.url, sentUrl: sent(b.url), title: b.title, folder: b.folder }));
+  return {
+    text: `<CURRENT STATE>\n${JSON.stringify(state, null, 1)}\n</CURRENT STATE>`,
+    tabs: tabItems,
+    bookmarks: bmItems,
+    folderCount: folders.length,
+    excludedCount,
+    map,
+    key: outgoingKey([...tabItems, ...bmItems].map((i) => i.sentUrl)),
+  };
+}
+
+// ---------- privacy preview ("before sending") ----------
+
+let outgoingResolve: ((send: boolean) => void) | null = null;
+
+/**
+ * Show the exact payload and wait for Send/Cancel. Skipped when previews are
+ * off or the same set was already approved in this session.
+ */
+async function confirmOutgoing(outgoing: Outgoing, purpose: string): Promise<boolean> {
+  const settings = await getSettings();
+  if (!settings.previewOutgoing || outgoing.key === approvedOutgoingKey) return true;
+  renderOutgoing(outgoing, purpose, settings);
+  showView("outgoing");
+  const send = await new Promise<boolean>((resolve) => (outgoingResolve = resolve));
+  outgoingResolve = null;
+  if (send) {
+    approvedOutgoingKey = outgoing.key;
+    await setSessionState("approvedOutgoingKey", approvedOutgoingKey);
+  }
+  showView("home");
+  return send;
+}
+
+function renderOutgoing(outgoing: Outgoing, purpose: string, settings: Settings): void {
+  let providerHost = "api.anthropic.com";
+  if (settings.provider !== "anthropic") {
+    try {
+      providerHost = new URL(settings.baseUrl).host;
+    } catch {
+      providerHost = settings.baseUrl;
+    }
+  }
+  const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+  $("outgoingSummary").textContent =
+    `${purpose} will send ${plural(outgoing.tabs.length, "open tab")}, ${plural(outgoing.bookmarks.length, "bookmark")} ` +
+    `and ${plural(outgoing.folderCount, "folder name")} to ${providerHost}` +
+    (outgoing.excludedCount ? ` \u00b7 ${outgoing.excludedCount} kept back by your privacy rules` : "") +
+    ".";
+  ($("outgoingAskAgain") as HTMLInputElement).checked = settings.previewOutgoing;
+  $("outgoingLibraryTitle").textContent = `Library: ${plural(outgoing.bookmarks.length, "bookmark")} (titles + URLs)`;
+  ($("outgoingLibrary") as HTMLDetailsElement).open =
+    outgoing.bookmarks.length > 0 && outgoing.bookmarks.length <= 12;
+
+  const rerender = async () => {
+    const fresh = await buildOutgoing();
+    renderOutgoing(fresh, purpose, await getSettings());
+  };
+  const makeRow = (item: OutgoingItem) => {
+    const row = document.createElement("div");
+    row.className = "tab-row";
+    row.appendChild(makeIcon(item.realUrl));
+    const text = document.createElement("div");
+    text.className = "tab-text";
+    const title = document.createElement("div");
+    title.className = "tab-title";
+    title.textContent = item.title + (item.folder ? `  \u00b7  ${item.folder}` : "");
+    const url = document.createElement("div");
+    url.className = "sent-url";
+    url.textContent = item.sentUrl;
+    url.title = item.sentUrl === item.realUrl ? item.realUrl : `Sent as shown. Real URL: ${item.realUrl}`;
+    text.append(title, url);
+    row.appendChild(text);
+
+    const lock = document.createElement("button");
+    lock.className = "add-btn";
+    lock.textContent = "\U0001F512";
+    lock.title = `Never send ${domainOf(item.realUrl)} (adds it to Options \u2192 Privacy)`;
+    lock.addEventListener("click", async () => {
+      const cur = await getSettings();
+      const d = domainOf(item.realUrl);
+      const list = parseExcludedDomains(cur.excludedDomains);
+      if (!list.includes(d)) await saveSettings({ ...cur, excludedDomains: [...list, d].join("\n") });
+      showToast(`${d} will never be sent`);
+      await rerender();
+    });
+    row.appendChild(lock);
+
+    const skipBtn = document.createElement("button");
+    skipBtn.className = "remove-btn";
+    skipBtn.textContent = "\u2715";
+    skipBtn.title = "Don't send this one (for this conversation)";
+    skipBtn.addEventListener("click", async () => {
+      sessionExcludedUrls.add(normalizeUrl(item.realUrl));
+      await setSessionState("sessionExcludedUrls", [...sessionExcludedUrls]);
+      await rerender();
+    });
+    row.appendChild(skipBtn);
+    return row;
+  };
+
+  const tabsEl = $("outgoingTabs");
+  tabsEl.replaceChildren();
+  if (!outgoing.tabs.length) {
+    const note = document.createElement("div");
+    note.className = "empty-note";
+    note.textContent = "No open tabs will be sent.";
+    tabsEl.appendChild(note);
+  }
+  for (const item of outgoing.tabs) tabsEl.appendChild(makeRow(item));
+  const bmEl = $("outgoingBookmarks");
+  bmEl.replaceChildren();
+  for (const item of outgoing.bookmarks) bmEl.appendChild(makeRow(item));
 }
 
 async function persistChat(): Promise<void> {
@@ -332,6 +503,29 @@ function showToast(text: string, undo?: () => Promise<void>): void {
 
 function matchesQuery(text: string): boolean {
   return !searchQuery || text.toLowerCase().includes(searchQuery.toLowerCase());
+}
+
+/** Text search as you type; once recall results exist, only those URLs pass. */
+function passesFilter(url: string, text: string): boolean {
+  if (findFilter) return findFilter.has(normalizeUrl(url));
+  return matchesQuery(text);
+}
+
+function whyLine(url: string): HTMLElement | null {
+  const why = findFilter?.get(normalizeUrl(url));
+  if (!why) return null;
+  const el = document.createElement("div");
+  el.className = "why";
+  el.textContent = `↳ ${why}`;
+  return el;
+}
+
+function lockMark(): HTMLElement {
+  const el = document.createElement("span");
+  el.className = "lock";
+  el.textContent = "🔒";
+  el.title = "On an excluded domain — never sent to the AI (Options → Privacy)";
+  return el;
 }
 
 /** Option label with tree indentation — folders read as a hierarchy, not paths. */
@@ -526,12 +720,16 @@ async function sendChat(userText: string): Promise<void> {
     return;
   }
 
+  let outgoing = await buildOutgoing();
+  if (!(await confirmOutgoing(outgoing, "This message"))) return;
+  outgoing = await buildOutgoing(); // the preview may have changed the exclusions
+
   busy = true;
   setBusyUi(true);
   addDisplayMessage({ role: "user", text: userText });
+  setDrawer(true);
 
-  const context = await buildContextBlock();
-  apiHistory.push({ role: "user", content: `${userText}\n\n${context}` });
+  apiHistory.push({ role: "user", content: `${userText}\n\n${outgoing.text}` });
 
   const bubble = renderMessage({ role: "assistant", text: "Thinking…" });
   let streamed = "";
@@ -563,7 +761,8 @@ async function sendChat(userText: string): Promise<void> {
       if (result.proposal) {
         // diff baseline: the proposal this one replaces
         if (pendingProposal) prevProposalMap = proposalMap(pendingProposal);
-        pendingProposal = result.proposal;
+        // the model saw sanitized URLs; resolve them back to the real tabs/bookmarks
+        pendingProposal = mapProposalBack(result.proposal, outgoing.map);
         ($("onlyChangesToggle") as HTMLInputElement).checked = !!prevProposalMap;
         renderReview();
       }
@@ -590,6 +789,54 @@ function setBusyUi(isBusy: boolean): void {
   sendBtn.title = isBusy ? "Stop generating" : "Send";
   sendBtn.classList.toggle("stopmode", isBusy);
   document.querySelectorAll<HTMLButtonElement>(".chip").forEach((b) => (b.disabled = isBusy));
+}
+
+// ---------- recall: Enter in the search box asks the AI ----------
+
+function clearFind(rerender: boolean): void {
+  findFilter = null;
+  $("findStrip").hidden = true;
+  if (rerender) void Promise.all([renderTree(), renderUnsorted()]);
+}
+
+function setFindStrip(text: string): void {
+  $("findText").textContent = text;
+  $("findStrip").hidden = false;
+}
+
+async function runFind(query: string): Promise<void> {
+  if (!query || findBusy) return;
+  const settings = await getSettings();
+  if (!settings.apiKey) {
+    openSetup(false);
+    return;
+  }
+  const outgoing = await buildOutgoing();
+  if (!(await confirmOutgoing(outgoing, "This search"))) return;
+
+  findBusy = true;
+  setFindStrip("Asking the librarian…");
+  try {
+    const matches = await runFindTurn({
+      settings,
+      query,
+      library: outgoing.text.replace("<CURRENT STATE>", "<LIBRARY>").replace("</CURRENT STATE>", "</LIBRARY>"),
+    });
+    findFilter = new Map(matches.map((m) => [normalizeUrl(realUrlOf(m.url, outgoing.map)), m.why]));
+    setFindStrip(
+      matches.length
+        ? `🔎 ${matches.length} match${matches.length === 1 ? "" : "es"} for “${query}”`
+        : `🔎 Nothing in your library matches “${query}”`
+    );
+    setPanel("foldersPanel", true);
+    setPanel("unsortedPanel", true);
+    await Promise.all([renderTree(), renderUnsorted()]);
+  } catch (err) {
+    $("findStrip").hidden = true;
+    showToast(friendlyApiError(err));
+  } finally {
+    findBusy = false;
+  }
 }
 
 // ---------- home: stats, unsorted, tree ----------
@@ -643,10 +890,13 @@ function makeTabRow(tab: UnsortedEntry, folders: { id: string; path: string[] }[
     dup.title = `${tab.dupCount} duplicate tabs with this URL`;
     title.appendChild(dup);
   }
+  if (tab.excluded) title.appendChild(lockMark());
   const domain = document.createElement("div");
   domain.className = "tab-domain";
   domain.textContent = domainOf(tab.url);
   text.append(title, domain);
+  const why = whyLine(tab.url);
+  if (why) text.appendChild(why);
   text.title = tab.url;
   text.addEventListener("click", () => {
     void chrome.tabs.update(tab.tabId, { active: true });
@@ -774,7 +1024,7 @@ async function renderUnsorted(): Promise<void> {
 
   if (!allUnsorted.length) return note("Everything is sorted 🎉");
 
-  const visible = allUnsorted.filter((t) => matchesQuery(`${t.title} ${t.url}`));
+  const visible = allUnsorted.filter((t) => passesFilter(t.url, `${t.title} ${t.url}`));
   if (!visible.length) return note("No unsorted tabs match your search.");
 
   // Collapse duplicate URLs into one row with a ×N badge.
@@ -825,6 +1075,7 @@ async function renderTree(): Promise<void> {
   }
 
   const query = searchQuery.toLowerCase();
+  const excludedDomains = parseExcludedDomains((await getSettings()).excludedDomains);
 
   const makeBookmarkRow = (child: chrome.bookmarks.BookmarkTreeNode): HTMLElement => {
     const row = document.createElement("div");
@@ -849,7 +1100,10 @@ async function renderTree(): Promise<void> {
     title.className = "tab-title";
     const source = placements[normalizeUrl(child.url!)]?.source;
     title.textContent = (child.title || child.url!) + (source === "manual" ? " 📌" : "");
+    if (isExcludedUrl(child.url!, excludedDomains)) title.appendChild(lockMark());
     text.appendChild(title);
+    const why = whyLine(child.url!);
+    if (why) text.appendChild(why);
     text.title = child.url!;
     text.addEventListener("click", () => void chrome.tabs.create({ url: child.url }));
     row.appendChild(text);
@@ -868,11 +1122,14 @@ async function renderTree(): Promise<void> {
   };
 
   const renderFolder = (node: chrome.bookmarks.BookmarkTreeNode): HTMLElement | null => {
-    const nameMatch = !!query && node.title.toLowerCase().includes(query);
+    const nameMatch = !findFilter && !!query && node.title.toLowerCase().includes(query);
     const childEls: HTMLElement[] = [];
     for (const child of node.children ?? []) {
       if (child.url) {
-        if (!query || nameMatch || `${child.title} ${child.url}`.toLowerCase().includes(query)) {
+        const show = findFilter
+          ? findFilter.has(normalizeUrl(child.url))
+          : !query || nameMatch || `${child.title} ${child.url}`.toLowerCase().includes(query);
+        if (show) {
           childEls.push(makeBookmarkRow(child));
         }
       } else {
@@ -1131,6 +1388,7 @@ async function renderTree(): Promise<void> {
 interface ReviewNode {
   children: Map<string, ReviewNode>;
   tabs: { url: string; title: string }[];
+  note?: string;
 }
 
 function buildReviewTree(folders: ProposalFolderEntry[]): ReviewNode {
@@ -1142,6 +1400,7 @@ function buildReviewTree(folders: ProposalFolderEntry[]): ReviewNode {
       node = node.children.get(part)!;
     }
     node.tabs.push(...folder.tabs);
+    if (folder.note) node.note = folder.note;
   }
   return root;
 }
@@ -1244,6 +1503,12 @@ function renderReview(): void {
     count.textContent = String(totalTabs(node));
     summary.append(chev, master, label, count);
     details.appendChild(summary);
+    if (node.note) {
+      const note = document.createElement("div");
+      note.className = "folder-note";
+      note.textContent = node.note;
+      details.appendChild(note);
+    }
     for (const row of rows) details.appendChild(row);
     for (const el of childEls) details.appendChild(el);
     return details;
@@ -1479,6 +1744,9 @@ function settingsFromForm(): Settings {
     includeAllWindows: ($("allWindowsInput") as HTMLInputElement).checked,
     includeLocalFiles: ($("includeLocalFilesInput") as HTMLInputElement).checked,
     backupsEnabled: ($("backupsEnabledInput") as HTMLInputElement).checked,
+    previewOutgoing: ($("previewOutgoingInput") as HTMLInputElement).checked,
+    stripQueryStrings: ($("stripQueryInput") as HTMLInputElement).checked,
+    excludedDomains: parseExcludedDomains(($("excludedDomainsInput") as HTMLTextAreaElement).value).join("\n"),
   };
 }
 
@@ -1532,6 +1800,9 @@ function openSetup(asOptions: boolean): void {
     ($("allWindowsInput") as HTMLInputElement).checked = s.includeAllWindows;
     ($("includeLocalFilesInput") as HTMLInputElement).checked = s.includeLocalFiles;
     ($("backupsEnabledInput") as HTMLInputElement).checked = s.backupsEnabled;
+    ($("previewOutgoingInput") as HTMLInputElement).checked = s.previewOutgoing;
+    ($("stripQueryInput") as HTMLInputElement).checked = s.stripQueryStrings;
+    ($("excludedDomainsInput") as HTMLTextAreaElement).value = s.excludedDomains;
   });
   void snapshotCount().then((n) => {
     $("clearBackupsBtn").textContent = `🗑 Clear (${n})`;
@@ -1833,6 +2104,8 @@ async function init(): Promise<void> {
   displayMessages = (await getSessionState<DisplayMessage[]>("displayMessages")) ?? [];
   pendingProposal = (await getSessionState<Proposal | null>("pendingProposal")) ?? null;
   prevProposalMap = (await getSessionState<Record<string, string> | null>("prevProposalMap")) ?? null;
+  approvedOutgoingKey = (await getSessionState<string>("approvedOutgoingKey")) ?? "";
+  sessionExcludedUrls = new Set((await getSessionState<string[]>("sessionExcludedUrls")) ?? []);
 
   renderAllMessages();
   renderReview();
@@ -1855,9 +2128,35 @@ async function init(): Promise<void> {
     "input",
     debounce(() => {
       searchQuery = searchInput.value.trim();
+      if (findFilter) clearFind(false); // typing again returns to plain text search
       void Promise.all([renderTree(), renderUnsorted()]);
     }, 150)
   );
+  searchInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void runFind(searchInput.value.trim());
+    } else if (e.key === "Escape") {
+      searchInput.value = "";
+      searchQuery = "";
+      clearFind(true);
+    }
+  });
+  $("findClearBtn").addEventListener("click", () => {
+    searchInput.value = "";
+    searchQuery = "";
+    clearFind(true);
+  });
+
+  // privacy preview buttons
+  const decideOutgoing = (send: boolean) => outgoingResolve?.(send);
+  $("outgoingSendBtn").addEventListener("click", () => decideOutgoing(true));
+  $("outgoingCancelBtn").addEventListener("click", () => decideOutgoing(false));
+  $("outgoingBackBtn").addEventListener("click", () => decideOutgoing(false));
+  $("outgoingAskAgain").addEventListener("change", async (e) => {
+    const on = (e.target as HTMLInputElement).checked;
+    await saveSettings({ ...(await getSettings()), previewOutgoing: on });
+  });
 
   // navigation
   $("optionsBtn").addEventListener("click", () => openSetup(true));
@@ -1933,7 +2232,15 @@ async function init(): Promise<void> {
     apiHistory = [];
     displayMessages = [];
     pendingProposal = null;
-    await clearSessionState(["apiHistory", "displayMessages", "pendingProposal"]);
+    sessionExcludedUrls = new Set();
+    approvedOutgoingKey = "";
+    await clearSessionState([
+      "apiHistory",
+      "displayMessages",
+      "pendingProposal",
+      "sessionExcludedUrls",
+      "approvedOutgoingKey",
+    ]);
     renderAllMessages();
     updateProposalUi();
   });

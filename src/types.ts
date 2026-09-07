@@ -11,6 +11,12 @@ export interface Settings {
   includeAllWindows: boolean;
   includeLocalFiles: boolean;
   backupsEnabled: boolean;
+  /** Privacy: show the outgoing payload before a new set of tabs/bookmarks is sent. */
+  previewOutgoing: boolean;
+  /** Privacy: drop ?query and #fragment from URLs before they leave the browser. */
+  stripQueryStrings: boolean;
+  /** Privacy: hosts (one per line) whose tabs/bookmarks are never sent. */
+  excludedDomains: string;
 }
 
 export type PlacementSource = "manual" | "llm";
@@ -33,6 +39,8 @@ export interface Removal {
 export interface ProposalFolderEntry {
   path: string[];
   tabs: ProposalTab[];
+  /** One line from the model on why these tabs are grouped here. */
+  note?: string;
 }
 
 export interface ProposalTab {
@@ -70,4 +78,6 @@ export interface OpenTabInfo {
   url: string;
   pinned: boolean;
   sorted: boolean;
+  /** On an excluded domain: shown in the panel, never sent to the AI. */
+  excluded?: boolean;
 }

@@ -17,6 +17,8 @@ Rules:
 - If a tab is ambiguous, put your question in the questions array of submit_proposal instead of guessing.
 - The removals array is for cleanup passes: when the user asks you to clean up, audit, or prune the library, you may propose deleting existing bookmarks (each with a reason — duplicate, outdated, superseded, etc.). Each bookmark's addedDaysAgo tells you how old it is. NEVER propose removing a manual placement unless the user explicitly asked for that bookmark or folder to be cleaned. When not doing cleanup, send an empty removals array.
 - Nothing you propose is applied until the user approves it in the review UI, so propose freely and refine based on feedback.
+- Give every proposed folder a "note": one short line (max 12 words) saying what belongs there. It is shown to the user as the reason for the grouping.
+- URLs in the state may have their query strings removed for privacy. Treat the title as the primary signal, and always echo URLs exactly as they were given to you.
 - Keep your text replies short and conversational; the proposal itself is rendered separately by the UI.`;
 
 const PROPOSAL_TOOL = {
@@ -51,8 +53,13 @@ const PROPOSAL_TOOL = {
                 additionalProperties: false,
               },
             },
+            note: {
+              type: "string",
+              description:
+                "One short line (max 12 words): what belongs in this folder, i.e. why these tabs are grouped here.",
+            },
           },
-          required: ["path", "tabs"],
+          required: ["path", "tabs", "note"],
           additionalProperties: false,
         },
       },
@@ -355,6 +362,113 @@ async function runOpenAiTurn(opts: {
   return { text, proposal, refusal: null, appendToHistory };
 }
 
+// ---------- recall: "where did I put that thing about…" ----------
+
+const FIND_SYSTEM_PROMPT = `You are Tab Librarian's recall assistant. The user is looking for something in their bookmark library or open tabs from a vague, natural-language description — they probably don't remember the title. You receive a LIBRARY block (bookmarks with their folder, plus open tabs) and a query.
+
+Call report_matches with the best matches, most likely first, at most 10. Match on meaning — topic, purpose, the kind of site it would be — not only on shared words. For each match give a "why" of at most 10 words. If nothing plausibly matches, return an empty array rather than guessing. Echo URLs exactly as given.`;
+
+const FIND_TOOL = {
+  name: "report_matches",
+  description: "Report the library entries that best match the user's description, most likely first.",
+  strict: true,
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      matches: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            url: { type: "string" },
+            why: { type: "string", description: "Why this matches, max 10 words." },
+          },
+          required: ["url", "why"],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ["matches"],
+    additionalProperties: false,
+  },
+};
+
+export interface FindMatch {
+  url: string;
+  why: string;
+}
+
+function sanitizeMatches(input: unknown): FindMatch[] {
+  const raw = (input as { matches?: unknown })?.matches;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m) => typeof m?.url === "string" && m.url)
+    .map((m) => ({ url: m.url as string, why: typeof m.why === "string" ? m.why.trim() : "" }))
+    .slice(0, 10);
+}
+
+/** One-shot recall call — independent of the chat history; the tool call is forced. */
+export async function runFindTurn(opts: {
+  settings: Settings;
+  query: string;
+  library: string;
+  registerStop?: (stop: () => void) => void;
+}): Promise<FindMatch[]> {
+  const { settings, query, library, registerStop } = opts;
+  const userText = `Query: ${query}
+
+${library}`;
+  const controller = new AbortController();
+  registerStop?.(() => controller.abort());
+
+  if (settings.provider === "openai") {
+    const res = await fetch(`${apiBase(settings)}/chat/completions`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: { "content-type": "application/json", authorization: `Bearer ${settings.apiKey}` },
+      body: JSON.stringify({
+        model: settings.model,
+        messages: [
+          { role: "system", content: FIND_SYSTEM_PROMPT },
+          { role: "user", content: userText },
+        ],
+        tools: [
+          {
+            type: "function",
+            function: { name: FIND_TOOL.name, description: FIND_TOOL.description, parameters: FIND_TOOL.input_schema },
+          },
+        ],
+        tool_choice: { type: "function", function: { name: FIND_TOOL.name } },
+      }),
+    });
+    if (!res.ok) throw new Error(`Endpoint returned ${res.status}: ${(await res.text()).slice(0, 300)}`);
+    const data = (await res.json()) as { choices?: { message?: { tool_calls?: OpenAiToolCall[] } }[] };
+    const call = (data.choices?.[0]?.message?.tool_calls ?? []).find((t) => t?.function?.name === FIND_TOOL.name);
+    if (!call) return [];
+    try {
+      return sanitizeMatches(JSON.parse(call.function.arguments || "{}"));
+    } catch {
+      return [];
+    }
+  }
+
+  const message = await makeClient(settings).beta.messages.create(
+    {
+      model: settings.model,
+      max_tokens: 2000,
+      system: FIND_SYSTEM_PROMPT,
+      tools: [FIND_TOOL],
+      tool_choice: { type: "tool", name: FIND_TOOL.name },
+      messages: [{ role: "user", content: userText }],
+    },
+    { signal: controller.signal }
+  );
+  const toolUse = message.content.find(
+    (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === FIND_TOOL.name
+  );
+  return toolUse ? sanitizeMatches(toolUse.input) : [];
+}
+
 function sanitizeProposal(input: unknown): Proposal {
   const raw = input as Partial<Proposal>;
   const folders = Array.isArray(raw.folders) ? raw.folders : [];
@@ -367,6 +481,7 @@ function sanitizeProposal(input: unknown): Proposal {
         tabs: (Array.isArray(f.tabs) ? f.tabs : []).filter(
           (t) => typeof t?.url === "string" && t.url && typeof t?.title === "string"
         ),
+        note: typeof f.note === "string" ? f.note.trim().slice(0, 120) : "",
       })),
     questions: questions.filter(
       (q) => typeof q?.question === "string" && q.question && typeof q?.url === "string"

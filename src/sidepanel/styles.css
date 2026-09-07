@@ -927,3 +927,14 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
   cursor: pointer;
   flex-shrink: 0;
 }
+
+/* ---------- privacy preview + recall ---------- */
+.find-strip { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-dim); padding: 0 4px; flex-shrink: 0; }
+.find-strip span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.why { font-size: 12px; color: var(--accent); margin-top: 2px; }
+.lock { font-size: 12px; margin-left: 4px; opacity: 0.75; }
+.folder-note { font-size: 12px; color: var(--text-dim); font-style: italic; margin: 0 0 6px 36px; }
+.sent-url { font-size: 12px; color: var(--text-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.field textarea { font-weight: 400; font-family: inherit; resize: vertical; min-height: 64px; }
+.opt-section .field textarea { background: var(--bg); }
+#outgoingLibrary .list { margin-top: 6px; }

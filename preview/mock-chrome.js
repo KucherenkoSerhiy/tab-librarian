@@ -27,6 +27,7 @@
         folders: [
           {
             path: ["Work", "Client A"],
+            note: "Everything for the Client A engagement",
             tabs: [{ url: "https://github.com/anthropics/anthropic-sdk-typescript", title: "GitHub – anthropic-sdk-typescript" }],
           },
           {
@@ -117,6 +118,7 @@
   const docs = ["Drag and Drop API", "details element", "prefers-color-scheme"];
   docs.forEach((t, i) => addTab(`MDN – ${t}`, `https://developer.mozilla.org/docs/${i}`));
   addTab("Hacker News", "https://news.ycombinator.com");
+  addTab("Bank – account overview", "https://bank.example.com/account?session=SECRET123&user=serhiy");
   addTab("Amazon – Ergonomic standing desk", "https://amazon.com/dp/B0XYZ");
   addTab("Amazon – USB-C dock comparison", "https://amazon.com/dp/B0ABC");
   addTab("TypeScript Handbook", "https://typescriptlang.org/docs");

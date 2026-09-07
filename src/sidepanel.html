@@ -212,7 +212,11 @@
         </label>
         <label class="check">
           <input type="checkbox" id="stripQueryInput" />
-          Strip query strings from URLs (<code>?id=…</code> and <code>#…</code> never leave the browser)
+          Redact before sending: query strings, tokens in URLs, emails and long numbers in titles
+        </label>
+        <label class="check">
+          <input type="checkbox" id="excludePrivateHostsInput" />
+          Never send localhost, private networks or intranet names
         </label>
         <label class="field">
           Never send these domains <span class="hint-inline">(one per line, subdomains included)</span>

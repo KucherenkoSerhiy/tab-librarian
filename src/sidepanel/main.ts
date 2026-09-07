@@ -1,20 +1,20 @@
 // Entry point: restore session state, wire every module, start syncing.
 import type { DisplayMessage, Proposal } from "../types";
-import type { ApiMessage } from "./llm";
-import { ensureManagedRoot } from "./bookmarks";
-import { snapshotNow } from "./backup";
-import { getSessionState, getSettings } from "./storage";
-import { state } from "./state";
-import { emit, requestRefresh } from "./bus";
-import { initTheme, setDrawer, setPanel, wireNav } from "./nav";
-import { renderAllMessages, wireChat } from "./chat";
-import { wireRecall } from "./recall";
-import { wireOutgoing } from "./outgoing";
-import { wireTabActions } from "./tabs";
-import { wireReview } from "./review";
-import { openSetup, wireOptions } from "./options";
-import { wireNewFolder } from "./tree";
-import { startSync } from "./refresh";
+import type { ApiMessage } from "./services/llm/index";
+import { ensureManagedRoot } from "./services/bookmarks";
+import { snapshotNow } from "./services/backup";
+import { getSessionState, getSettings } from "./services/storage";
+import { state } from "./app/state";
+import { emit, requestRefresh } from "./app/bus";
+import { initTheme, setDrawer, setPanel, wireNav } from "./app/nav";
+import { renderAllMessages, wireChat } from "./ui/chat/chat";
+import { wireRecall } from "./ui/home/recall";
+import { wireOutgoing } from "./ui/privacy/outgoing";
+import { wireTabActions } from "./ui/home/unsorted";
+import { wireReview } from "./ui/review/review";
+import { openSetup, wireOptions } from "./ui/options/options";
+import { wireNewFolder } from "./ui/home/tree";
+import { startSync } from "./app/refresh";
 
 async function init(): Promise<void> {
   await initTheme();

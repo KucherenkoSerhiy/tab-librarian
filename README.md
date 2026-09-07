@@ -54,6 +54,28 @@ The apply step is a **diff, not a rebuild**: it creates missing folders/bookmark
 
 Firefox: no AMO listing yet; build it yourself with `npm run build:firefox` (see Development).
 
+## Code layout
+
+```
+src/
+  types.ts                 shared types (settings, proposal, placements)
+  background.ts            service worker: context menu, backup alarm
+  sidepanel.html           the panel (home, review, before-sending, options)
+  sidepanel/
+    main.ts                entry: restore session, wire modules, start syncing
+    app/                   state (one shared object), bus (refresh/proposal events), nav, refresh
+    domain/                pure rules: urls, privacy (redaction, exclusions, URL mapping)
+    services/              chrome + network: bookmarks, storage, backup, tabs, payload,
+      llm/                 prompts, tool schemas, anthropic, openai, index (dispatch)
+    ui/                    dom, drag, filter, picker + one folder per screen:
+      home/ chat/ privacy/ review/ options/
+tests/
+  unit/                    node:test on the pure rules — npm test
+  harness/                 mock chrome API + per-area browser suites — npm run test:ui, open /test.html
+```
+
+Dependencies point inward: `ui/*` → `app/*` + `services/*` → `domain/*` → `types`. Screens never import each other; they ask for a refresh or announce a proposal through `app/bus.ts`.
+
 ## Development
 
 ```bash
@@ -79,11 +101,14 @@ Other scripts: `npm run build:firefox` produces `dist-firefox/` (Firefox port: `
 
 ## What leaves your browser, and how to control it (v1.1)
 
-Every AI call carries the titles and URLs of your open tabs plus your library (bookmark titles, URLs, folder names). Three controls in **Options → Privacy** decide what that payload contains:
+Every AI call carries the titles and URLs of your open tabs plus your library (bookmark titles, URLs, folder names). Before any of it is sent it passes through one place, `src/sidepanel/domain/privacy.ts`, and the controls in **Options → Privacy** decide what survives:
 
 - **Preview before sending** (on by default) — a "Before sending" step lists every title and URL exactly as it will be sent, with the provider host. ✕ skips an item for the current conversation; 🔒 adds its domain to the exclusion list. The step only reappears when the set of items changes, so refining a proposal in chat doesn't nag.
-- **Strip query strings** (on by default) — `?session=…`, `?q=…` and `#fragments` never leave the browser. Bookmarks keep the full URL locally; the model sees the path and the title, and its answers are mapped back to the real tabs.
+- **Redact before sending** (on by default) — credentials in URLs (`user:pass@`) always go. With this on, so do query strings and fragments (`?session=…`, `?q=…`, `#…`), path segments that look like tokens or opaque ids (JWTs, UUIDs, long hex, 12+ digit ids → `~`), and emails and 9+ digit numbers in titles (`[email]`, `[number]`). Bookmarks keep the full URL locally; the model's answers are mapped back to the real tabs.
+- **Never send private networks** (on by default) — localhost, private IP ranges, `.local`/`.internal`/`.lan`/`.corp` hosts and bare intranet names never reach the AI.
 - **Excluded domains** — tabs and bookmarks on those hosts (subdomains included) stay in the panel marked 🔒, can still be filed by hand, and are never sent.
+
+The rules are pure functions with unit tests (`npm test`); the browser harness checks the preview end to end.
 
 ## Finding things later (v1.1)
 

@@ -2,7 +2,23 @@
 window.__harness.suite(async ({ t, assert, wait, $ }) => {
     await t("find strip is hidden until the AI is asked", async () => {
       assert($("findStrip").hidden, "find strip visible without a query");
+        await t("privacy: excluding a domain from the preview confirms with a visible toast", async () => {
+      $("chatInput").value = "sort my tabs please";
+      $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
+      await wait(600);
+      assert(!$("view-outgoing").hidden, "preview did not open");
+      const row = [...document.querySelectorAll("#outgoingTabs .tab-row")].find((r) => r.textContent.includes("github"));
+      assert(row, "no github row to exclude");
+      row.querySelector(".add-btn").click();
+      await wait(500);
+      const toast = $("toast");
+      assert(!toast.hidden && toast.getBoundingClientRect().height > 0, "toast not visible over the preview");
+      assert(/github\.com will never be sent/.test(toast.textContent), `unexpected toast: ${toast.textContent}`);
+      assert(!$("view-outgoing").hidden, "preview closed unexpectedly");
+      $("outgoingCancelBtn").click();
+      await wait(300);
     });
+});
     await t("privacy: excluded domain shows a lock and is kept out of the payload", async () => {
       const { settings } = await chrome.storage.local.get("settings");
       await chrome.storage.local.set({ settings: { ...settings, excludedDomains: "bank.example.com" } });

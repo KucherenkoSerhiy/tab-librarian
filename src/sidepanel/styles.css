@@ -897,7 +897,8 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 /* ---------- toast ---------- */
 
 #toast {
-  position: absolute;
+  position: fixed;
+  z-index: 50;
   left: 50%;
   bottom: 64px;
   transform: translateX(-50%);

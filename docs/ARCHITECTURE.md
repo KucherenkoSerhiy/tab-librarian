@@ -83,7 +83,7 @@ flowchart LR
   R -->|private network| K
   R -->|skipped this conversation| K
   R -->|passes| X[redact]
-  X -->|"credentials always<br/>?query #fragment<br/>token-like path segments → ~<br/>emails → [email]<br/>9+ digit numbers → [number]"| M[sent→real URL map<br/>deterministic, unique]
+  X -->|"credentials always<br/>query string and fragment<br/>token-like path segments → ~<br/>emails → [email]<br/>9+ digit numbers → [number]"| M[sent→real URL map<br/>deterministic, unique]
   M --> P[CURRENT STATE JSON<br/>+ folder names]
   P --> V[Before sending<br/>groups · kept back · exact text]
   V -->|Send| A[(provider)]
@@ -123,7 +123,7 @@ sequenceDiagram
   C-->>R: emit("proposal")
   R->>U: Review: folders (with "Why: …"), questions, removals
   U->>R: Apply
-  R->>R: applyProposal → bookmarks; undo data kept 5 s
+  R->>R: applyProposal writes bookmarks, keeps undo data 5 s
 ```
 
 ## 4. Recall (Enter in the search box)

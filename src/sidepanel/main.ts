@@ -1138,6 +1138,12 @@ async function renderTree(): Promise<void> {
       }
     }
     if (query && !nameMatch && !childEls.length) return null;
+    // while filtering, the badge counts what is shown inside, not the folder's full size
+    const filtering = !!query || !!findFilter;
+    const shownInside = childEls.reduce(
+      (n, el) => n + (el.classList.contains("bm-row") ? 1 : Number(el.dataset.matches ?? 0)),
+      0
+    );
 
     const details = document.createElement("details");
     // collapsed by default, but re-renders keep the user's expansion state
@@ -1209,7 +1215,9 @@ async function renderTree(): Promise<void> {
     const bookmarkTotal = countBookmarks(node);
     const count = document.createElement("span");
     count.className = "count";
-    count.textContent = String(bookmarkTotal);
+    count.textContent = String(filtering ? shownInside : bookmarkTotal);
+    count.title = filtering ? `${shownInside} match${shownInside === 1 ? "" : "es"} of ${bookmarkTotal}` : "";
+    details.dataset.matches = String(shownInside);
     summary.appendChild(count);
 
     const stopThrough = (e: Event) => {

@@ -354,6 +354,19 @@
       await wait(300);
     });
 
+    await t("search: folder badges count matches, not folder size", async () => {
+      const s = $("searchInput");
+      s.value = "figma";
+      s.dispatchEvent(new Event("input"));
+      await wait(300);
+      const badges = [...document.querySelectorAll("#tree details > summary .count")].map((c) => Number(c.textContent));
+      assert(badges.length > 0, "no folders shown for the search");
+      assert(badges.every((n) => n >= 1 && n <= 2), `badges should be small match counts, got ${badges.join(",")}`);
+      s.value = "";
+      s.dispatchEvent(new Event("input"));
+      await wait(300);
+    });
+
     const passed = results.filter((r) => r.ok).length;
     const box = document.createElement("div");
     box.id = "test-results";

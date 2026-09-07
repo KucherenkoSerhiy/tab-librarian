@@ -108,7 +108,7 @@ Every AI call carries the titles and URLs of your open tabs plus your library (b
 - **Never send private networks** (on by default) — localhost, private IP ranges, `.local`/`.internal`/`.lan`/`.corp` hosts and bare intranet names never reach the AI.
 - **Excluded domains** — tabs and bookmarks on those hosts (subdomains included) stay in the panel marked 🔒, can still be filed by hand, and are never sent.
 
-The rules are pure functions with unit tests (`npm test`); the browser harness checks the preview end to end (`npm run test:ui`), and `npm run evidence` captures a screenshot per step into `marketing/evidence-v1.1/`.
+The rules are pure functions with unit tests (`npm test`); the browser harness checks the preview end to end (`npm run test:ui`), and `npm run evidence` captures a screenshot per step into `docs/evidence/v1.1/`.
 
 ## Finding things later (v1.1)
 

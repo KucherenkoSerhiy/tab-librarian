@@ -9,15 +9,8 @@ export function scrollChatToBottom(): void {
 }
 
 
-export function domainOf(url: string): string {
-  try {
-    const u = new URL(url);
-    if (u.protocol === "file:") return "local file";
-    return u.hostname.replace(/^www\./, "");
-  } catch {
-    return url;
-  }
-}
+import { domainOf } from "../domain/urls";
+export { domainOf };
 
 /** Deterministic hue from a domain so each site gets a stable letter avatar. */
 export function makeAvatar(url: string, size = 32): HTMLElement {

@@ -939,3 +939,20 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .field textarea { font-weight: 400; font-family: inherit; resize: vertical; min-height: 64px; }
 .opt-section .field textarea { background: var(--bg); }
 #outgoingLibrary .list { margin-top: 6px; }
+
+/* ---------- before sending: groups, kept back, raw text ---------- */
+.og-h { font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); margin: 14px 0 6px; font-weight: 700; }
+.og-group { background: var(--surface); border-radius: var(--radius); box-shadow: var(--shadow); }
+.og-group > summary { list-style: none; display: flex; align-items: center; gap: 8px; padding: 8px 10px; cursor: pointer; }
+.og-group > summary::-webkit-details-marker { display: none; }
+.og-group > summary::before { content: "▶"; font-size: 11px; color: var(--text-dim); transition: transform 0.15s; }
+.og-group[open] > summary::before { transform: rotate(90deg); }
+.og-name { flex: 1; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.og-count { color: var(--text-dim); font-size: 12px; white-space: nowrap; }
+.og-entry { display: flex; align-items: flex-start; gap: 8px; padding: 6px 10px 8px 34px; border-top: 1px solid var(--border); }
+.og-text { flex: 1; min-width: 0; }
+.og-title { font-size: 13px; white-space: normal; overflow-wrap: anywhere; }
+.og-entry .sent-url, .kb-row .sent-url { white-space: normal; overflow: visible; overflow-wrap: anywhere; }
+.kb-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface); border-radius: var(--radius); opacity: 0.85; }
+.kb-reason { font-size: 12px; color: var(--text-dim); }
+.raw { margin: 0; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 60vh; overflow: auto; }

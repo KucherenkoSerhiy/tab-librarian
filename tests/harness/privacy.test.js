@@ -7,7 +7,7 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
       await wait(600);
       assert(!$("view-outgoing").hidden, "preview did not open");
-      const row = [...document.querySelectorAll("#outgoingTabs .tab-row")].find((r) => r.textContent.includes("github"));
+      const row = [...document.querySelectorAll("#outgoingGroups .og-group")].find((r) => r.textContent.includes("github"));
       assert(row, "no github row to exclude");
       row.querySelector(".add-btn").click();
       await wait(500);
@@ -42,8 +42,10 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       const urls = [...document.querySelectorAll("#view-outgoing .sent-url")].map((e) => e.textContent);
       assert(urls.length > 0, "no outgoing rows");
       assert(urls.every((u) => !u.includes("?") && !u.includes("SECRET")), `query string leaked: ${urls.find((u) => u.includes("?"))}`);
-      assert(!$("view-outgoing").textContent.includes("bank.example.com"), "excluded domain present in preview");
-      assert($("outgoingSummary").textContent.includes("kept back"), "summary does not mention kept-back items");
+      assert(!$("outgoingGroups").textContent.includes("bank.example.com"), "excluded domain listed for sending");
+      assert(!$("outgoingRaw").textContent.includes("bank.example.com"), "excluded domain present in the raw payload");
+      assert($("outgoingKeptList").textContent.includes("bank.example.com"), "excluded domain not shown under kept back");
+      assert(/excluded domain/.test($("outgoingKeptList").textContent), "kept-back reason missing");
       $("outgoingCancelBtn").click();
       await wait(300);
       assert(!$("view-home").hidden, "did not return home after cancel");
@@ -54,10 +56,10 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       $("chatInput").value = "sort my tabs please";
       $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
       await wait(600);
-      const rowsBefore = document.querySelectorAll("#outgoingTabs .tab-row").length;
-      document.querySelector("#outgoingTabs .tab-row .remove-btn").click();
+      const rowsBefore = document.querySelectorAll("#outgoingGroups .og-entry").length;
+      document.querySelector("#outgoingGroups .og-entry .remove-btn").click();
       await wait(500);
-      const rowsAfter = document.querySelectorAll("#outgoingTabs .tab-row").length;
+      const rowsAfter = document.querySelectorAll("#outgoingGroups .og-entry").length;
       assert(rowsAfter === rowsBefore - 1, `expected ${rowsBefore - 1} rows, got ${rowsAfter}`);
       $("outgoingCancelBtn").click();
       await wait(300);
@@ -79,15 +81,17 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
     });
     await t("privacy: titles are redacted and private hosts are kept back", async () => {
       await chrome.tabs.create({ url: "http://intranet/wiki", title: "Wiki – jane.doe@example.com – 4111 1111 1111 1111" });
-      await chrome.tabs.create({ url: "https://public.example.com/report", title: "Report for jane.doe@example.com" });
+      await chrome.tabs.create({ url: "https://public.example.com/report?token=abc", title: "Report for jane.doe@example.com – card 4111 1111 1111 1111" });
       await wait(2600);
       $("chatInput").value = "sort my tabs please";
       $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
       await wait(600);
-      const text = $("view-outgoing").textContent;
-      assert(!text.includes("intranet"), "private host was listed for sending");
-      assert(!text.includes("jane.doe@example.com"), "email leaked into the payload preview");
-      assert(text.includes("[email]"), "redacted title marker missing");
+      const raw = $("outgoingRaw").textContent;
+      assert(!raw.includes("intranet"), "private host is in the raw payload");
+      assert(!raw.includes("jane.doe@example.com"), "email is in the raw payload");
+      assert(!raw.includes("4111"), "card number is in the raw payload");
+      assert(raw.includes("[email]") && raw.includes("[number]"), "redaction markers missing from the raw payload");
+      assert(/intranet.*private network/s.test($("outgoingKeptList").textContent), "private host not shown under kept back with its reason");
       $("outgoingCancelBtn").click();
       await wait(300);
     });

@@ -1,11 +1,11 @@
 // Drives the preview harness in headless Brave/Chrome over the DevTools protocol
 // at side-panel width and saves a PNG per step. Needs `npm run preview` running.
-//   node scripts/evidence.mjs [outDir]
+//   npm run evidence   (or: node tests/harness/evidence.mjs [outDir])
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const OUT = process.argv[2] ?? join("marketing", "evidence-v1.1");
+const OUT = process.argv[2] ?? join("marketing", "evidence-v1.1"); // gitignored: evidence is attached to the PR, not committed
 const URL_ = "http://[::1]:4173/preview.html";
 const PORT = 9333;
 const BROWSERS = [
@@ -101,12 +101,12 @@ await evaluate(`(async () => {
   return !document.getElementById("view-outgoing").hidden;
 })()`);
 await shot("before-sending");
-await evaluate(`var row = [...document.querySelectorAll("#outgoingTabs .tab-row")].find((r) => r.textContent.includes("[email]")); row && row.scrollIntoView({ block: "center" }); __h.sleep(200)`);
-await shot("before-sending-redacted-title");
-await evaluate(`(async () => { const rows = document.querySelectorAll("#outgoingTabs .tab-row"); rows[0].querySelector(".remove-btn").click(); await __h.sleep(600); document.querySelector("#outgoingSummary").scrollIntoView(); })()`);
-await shot("before-sending-skip-item");
-await evaluate(`(async () => { var row = [...document.querySelectorAll("#outgoingTabs .tab-row")].find((r) => r.textContent.includes("youtube")); row.querySelector(".add-btn").click(); await __h.sleep(700); })()`);
-await shot("before-sending-exclude-domain");
+await evaluate(`(async () => { var g = [...document.querySelectorAll("#outgoingGroups .og-group")].find((r) => r.textContent.includes("portal.example.com")); g.open = true; g.scrollIntoView({ block: "center" }); await __h.sleep(200); })()`);
+await shot("before-sending-redacted-entry");
+await evaluate(`(async () => { var g = [...document.querySelectorAll("#outgoingGroups .og-group")].find((r) => r.textContent.includes("youtube")); g.querySelector("summary .add-btn").click(); await __h.sleep(700); document.querySelector("#outgoingKeptBack").scrollIntoView({ block: "start" }); })()`);
+await shot("before-sending-kept-back");
+await evaluate(`(async () => { const box = document.querySelector("#outgoingRawBox"); box.open = true; box.scrollIntoView({ block: "start" }); await __h.sleep(300); })()`);
+await shot("before-sending-exact-text");
 await evaluate(`__h.$("outgoingCancelBtn").click(); __h.sleep(400)`);
 
 // Search: badges count matches; sentence → hint; Enter → preview

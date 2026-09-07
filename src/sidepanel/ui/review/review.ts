@@ -135,7 +135,8 @@ export function renderReview(): void {
     if (node.note) {
       const note = document.createElement("div");
       note.className = "folder-note";
-      note.textContent = node.note;
+      note.title = "One line from the model on why these tabs are grouped here";
+      note.textContent = `Why: ${node.note}`;
       details.appendChild(note);
     }
     for (const row of rows) details.appendChild(row);

@@ -1,16 +1,18 @@
 // What a provider call will carry, after the privacy rules are applied.
-import type { Settings } from "../../types";
 import type { OutgoingMap } from "../domain/privacy";
-import { getManagedTree } from "./bookmarks";
-import { on } from "../app/bus";
-import { showView } from "../app/nav";
-import { buildOutgoingMap, isExcludedUrl, isPrivateHost, outgoingKey, parseExcludedDomains, redactTitle } from "../domain/privacy";
 import { state } from "../app/state";
-import { getPlacements, getRemovals, getSettings, saveSettings, setSessionState } from "./storage";
-import { getOpenTabs } from "./tabs";
+import {
+  buildOutgoingMap,
+  isExcludedUrl,
+  isPrivateHost,
+  outgoingKey,
+  parseExcludedDomains,
+  redactTitle,
+} from "../domain/privacy";
 import { normalizeUrl } from "../domain/urls";
-
-
+import { getManagedTree } from "./bookmarks";
+import { getPlacements, getRemovals, getSettings } from "./storage";
+import { getOpenTabs } from "./tabs";
 
 export interface OutgoingItem {
   realUrl: string;
@@ -20,13 +22,21 @@ export interface OutgoingItem {
   folder?: string;
 }
 
+/** An item a privacy rule kept out of the payload, and which rule. */
+export interface KeptBackItem {
+  realUrl: string;
+  title: string;
+  reason: "excluded" | "private" | "skipped";
+}
+
 /** Everything a provider call will carry, after the privacy rules are applied. */
 export interface Outgoing {
+  /** the literal CURRENT STATE block appended to the user message */
   text: string;
   tabs: OutgoingItem[];
   bookmarks: OutgoingItem[];
   folderCount: number;
-  excludedCount: number;
+  keptBack: KeptBackItem[];
   map: OutgoingMap;
   key: string;
 }
@@ -40,10 +50,18 @@ export async function buildOutgoing(): Promise<Outgoing> {
     getOpenTabs(),
   ]);
   const excludedDomains = parseExcludedDomains(settings.excludedDomains);
-  const skip = (url: string) =>
-    isExcludedUrl(url, excludedDomains) ||
-    (settings.excludePrivateHosts && isPrivateHost(url)) ||
-    state.sessionExcludedUrls.has(normalizeUrl(url));
+  const keptBack: KeptBackItem[] = [];
+  const skip = (url: string, title: string): boolean => {
+    const reason: KeptBackItem["reason"] | null = isExcludedUrl(url, excludedDomains)
+      ? "excluded"
+      : settings.excludePrivateHosts && isPrivateHost(url)
+        ? "private"
+        : state.sessionExcludedUrls.has(normalizeUrl(url))
+          ? "skipped"
+          : null;
+    if (reason) keptBack.push({ realUrl: url, title, reason });
+    return reason !== null;
+  };
 
   const folders: string[] = [];
   const bookmarks: {
@@ -53,14 +71,10 @@ export async function buildOutgoing(): Promise<Outgoing> {
     source: string;
     addedDaysAgo?: number;
   }[] = [];
-  let excludedCount = 0;
   const walk = (node: chrome.bookmarks.BookmarkTreeNode, path: string[]) => {
     for (const child of node.children ?? []) {
       if (child.url) {
-        if (skip(child.url)) {
-          excludedCount++;
-          continue;
-        }
+        if (skip(child.url, child.title)) continue;
         const key = normalizeUrl(child.url);
         bookmarks.push({
           url: child.url,
@@ -79,15 +93,9 @@ export async function buildOutgoing(): Promise<Outgoing> {
   };
   walk(tree, []);
 
-  const sentTabs = tabs.filter((t) => {
-    if (skip(t.url)) {
-      excludedCount++;
-      return false;
-    }
-    return true;
-  });
+  const sentTabs = tabs.filter((t) => !skip(t.url, t.title));
   const removedByUser = Object.entries(removals)
-    .filter(([url]) => !skip(url))
+    .filter(([url]) => !isExcludedUrl(url, excludedDomains) && !(settings.excludePrivateHosts && isPrivateHost(url)))
     .map(([url, r]) => ({ url, removedFromFolder: r.folderPath }));
 
   const map = buildOutgoingMap(
@@ -112,11 +120,11 @@ export async function buildOutgoing(): Promise<Outgoing> {
   const tabItems = sentTabs.map((t) => ({ realUrl: t.url, sentUrl: sent(t.url), title: sentTitle(t.title) }));
   const bmItems = bookmarks.map((b) => ({ realUrl: b.url, sentUrl: sent(b.url), title: sentTitle(b.title), folder: b.folder }));
   return {
-    text: `<CURRENT STATE>\n${JSON.stringify(payload, null, 1)}\n</CURRENT STATE>`,
+    text: `<CURRENT STATE>\n${JSON.stringify(payload, null, 2)}\n</CURRENT STATE>`,
     tabs: tabItems,
     bookmarks: bmItems,
     folderCount: folders.length,
-    excludedCount,
+    keptBack,
     map,
     key: outgoingKey([...tabItems, ...bmItems].map((i) => i.sentUrl)),
   };

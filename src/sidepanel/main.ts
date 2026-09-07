@@ -369,7 +369,7 @@ function renderOutgoing(outgoing: Outgoing, purpose: string, settings: Settings)
 
     const lock = document.createElement("button");
     lock.className = "add-btn";
-    lock.textContent = "\U0001F512";
+    lock.textContent = "🔒";
     lock.title = `Never send ${domainOf(item.realUrl)} (adds it to Options \u2192 Privacy)`;
     lock.addEventListener("click", async () => {
       const cur = await getSettings();

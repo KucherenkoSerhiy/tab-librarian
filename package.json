@@ -10,10 +10,11 @@
     "test": "node --test \"tests/unit/*.test.ts\"",
     "preview:setup": "node tests/harness/make-preview.mjs",
     "preview": "vite preview --port 4173 --strictPort",
-    "test:ui": "npm run build && npm run preview:setup && npm run preview",
+    "test:ui": "npm run build && npm run preview:setup && node scripts/run-harness.mjs",
     "build:firefox": "npm run build && node scripts/make-firefox.mjs",
     "package": "npm run build && powershell -NoProfile -Command \"Compress-Archive -Path dist/* -DestinationPath tab-librarian.zip -Force\"",
-    "check": "tsc --noEmit && node scripts/check-layers.mjs && npm test"
+    "check": "tsc --noEmit && node scripts/check-layers.mjs && npm test",
+    "evidence": "node scripts/evidence.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0"

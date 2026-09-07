@@ -5,7 +5,9 @@ window.__harness = (() => {
   const wait = (ms) => new Promise((r) => setTimeout(r, ms));
   const results = [];
   const suites = [];
+  window.__TEST_PROGRESS = results;
   const t = async (name, fn) => {
+    window.__TEST_CURRENT = name;
     try {
       await fn();
       results.push({ name, ok: true });

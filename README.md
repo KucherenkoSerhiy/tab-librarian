@@ -71,7 +71,7 @@ src/
       home/ chat/ privacy/ review/ options/
 tests/
   unit/                    node:test on the pure rules — npm test
-  harness/                 mock chrome API + per-area browser suites — npm run test:ui, open /test.html
+  harness/                 mock chrome API + per-area browser suites — npm run test:ui (headless)
 ```
 
 Dependencies point inward: `ui/*` → `app/*` + `services/*` → `domain/*` → `types`. Screens never import each other; they ask for a refresh or announce a proposal through `app/bus.ts`.
@@ -108,7 +108,7 @@ Every AI call carries the titles and URLs of your open tabs plus your library (b
 - **Never send private networks** (on by default) — localhost, private IP ranges, `.local`/`.internal`/`.lan`/`.corp` hosts and bare intranet names never reach the AI.
 - **Excluded domains** — tabs and bookmarks on those hosts (subdomains included) stay in the panel marked 🔒, can still be filed by hand, and are never sent.
 
-The rules are pure functions with unit tests (`npm test`); the browser harness checks the preview end to end.
+The rules are pure functions with unit tests (`npm test`); the browser harness checks the preview end to end (`npm run test:ui`), and `npm run evidence` captures a screenshot per step into `marketing/evidence-v1.1/`.
 
 ## Finding things later (v1.1)
 

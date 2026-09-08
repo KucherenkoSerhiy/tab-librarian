@@ -9,6 +9,7 @@ import { emit, requestRefresh } from "./app/bus";
 import { initTheme, setDrawer, setPanel, wireNav } from "./app/nav";
 import { renderAllMessages, wireChat } from "./ui/chat/chat";
 import { wireRecall } from "./ui/home/recall";
+import { wireUndo } from "./ui/home/undo";
 import { wireOutgoing } from "./ui/privacy/outgoing";
 import { wireTabActions } from "./ui/home/unsorted";
 import { wireReview } from "./ui/review/review";
@@ -26,10 +27,12 @@ async function init(): Promise<void> {
   state.prevProposalMap = (await getSessionState<Record<string, string> | null>("prevProposalMap")) ?? null;
   state.approvedOutgoingKey = (await getSessionState<string>("approvedOutgoingKey")) ?? "";
   state.sessionExcludedUrls = new Set((await getSessionState<string[]>("sessionExcludedUrls")) ?? []);
+  state.lastApply = (await getSessionState<typeof state.lastApply>("lastApply")) ?? null;
 
   wireNav();
   wireChat();
   wireRecall();
+  wireUndo();
   wireOutgoing();
   wireTabActions();
   wireReview();

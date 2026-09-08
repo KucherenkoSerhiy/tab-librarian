@@ -16,7 +16,7 @@ Mobile-first (large touch targets, one task per screen), with a one-click 🌙/�
 2. **Review** — the proposal as a nested checkbox tree with folder-level master checkboxes, `new`/`moved` **diff badges** versus the previous proposal (with an "only show changes" filter), proposed **removals** with reasons, and the model's **questions — answerable inline** (type an answer, batch-send) or resolved instantly by filing the tab yourself via the **type-ahead folder picker**.
 3. **Setup / Options** — provider toggle (Anthropic / OpenAI-compatible), key + model, a token-free **Test connection** button, behavior toggles, and the Backup section (snapshots on/off, export/import, restore).
 
-Every destructive or filing action (file, unfile, close tab(s), delete folder, apply proposal) raises a 5-second toast with **Undo** — apply-undo fully reverts created bookmarks/folders, moves, deletions, and metadata. Bulk closes never kill the browser: a window about to be emptied gets a fresh New Tab first.
+Every destructive or filing action (file, unfile, close tab(s), delete folder) raises a 5-second toast with **Undo**. Applying a proposal leaves an **Undo** line on the home screen that stays until you dismiss it or apply something else, so a mistake found an hour later is one click away; it fully reverts created bookmarks/folders, moves, deletions, and metadata, and the same line then offers **Redo**. Older changes: Options → Snapshots (one is taken before every apply). Bulk closes never kill the browser: a window about to be emptied gets a fresh New Tab first.
 
 ## How it works
 

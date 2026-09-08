@@ -64,10 +64,28 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       await wait(150);
       $("approveBtn").click();
       await wait(700);
-      assert(/Applied/.test(document.querySelector("#toast .toast-text").textContent), "no applied toast");
-      document.querySelector("#toast .undo-btn").click();
+      assert(!$("view-home").hidden, "did not return home after apply");
+      assert(!$("undoStrip").hidden && /Applied/.test($("undoText").textContent), `no undo strip; text: ${$("undoText").textContent}`);
+      assert((await chrome.storage.session.get("lastApply")).lastApply, "undo data not persisted for the session");
+      await wait(5500); // well past the old 5-second toast: the strip must still be there
+      assert(!$("undoStrip").hidden, "undo strip vanished on its own");
+      const applied = counts();
+      $("undoBtn").click();
       await wait(700);
       assert(counts() === before, `counters not reverted: "${counts()}" vs "${before}"`);
+      assert(!$("undoStrip").hidden && /Reverted/.test($("undoText").textContent), "strip should now offer Redo");
+      assert($("undoBtn").textContent === "Redo", `button should read Redo, got ${$("undoBtn").textContent}`);
+      $("undoBtn").click(); // redo
+      await wait(900);
+      assert(counts() === applied, `redo did not restore the apply: "${counts()}" vs "${applied}"`);
+      assert($("undoBtn").textContent === "Undo", "button should read Undo again after redo");
+      $("undoBtn").click(); // undo again, leave the library as it was
+      await wait(700);
+      assert(counts() === before, `second undo failed: "${counts()}" vs "${before}"`);
+      $("undoDismissBtn").click();
+      await wait(300);
+      assert($("undoStrip").hidden, "strip still shown after dismiss");
+      assert(!(await chrome.storage.session.get("lastApply")).lastApply, "undo data not cleared after dismiss");
     });
     await t("review shows the folder note (why grouped)", async () => {
       $("resumeReviewBtn").click();

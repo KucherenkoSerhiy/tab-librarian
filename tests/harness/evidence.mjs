@@ -134,6 +134,11 @@ await evaluate(`__h.setInput(__h.$("searchInput"), ""); __h.sleep(300)`);
 await evaluate(`__h.$("resumeReviewBtn").click(); __h.sleep(400)`);
 await shot("review-folder-note");
 
+// Apply → the Undo line on Home stays (no timer); one click reverts the apply
+await evaluate(`__h.$("approveBtn").click(); __h.sleep(900)`);
+await evaluate(`__h.sleep(5500)`); // past the old 5-second toast window
+await shot("undo-strip-after-apply");
+
 ws.close();
 proc.kill();
 console.log("done:", n, "screenshots in", OUT);

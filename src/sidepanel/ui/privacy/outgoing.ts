@@ -5,30 +5,39 @@ import { showView } from "../../app/nav";
 import { state } from "../../app/state";
 import { parseExcludedDomains } from "../../domain/privacy";
 import { domainOf, normalizeUrl } from "../../domain/urls";
-import type { KeptBackItem, Outgoing, OutgoingItem } from "../../services/payload";
+import type { KeptBackItem, Outgoing, OutgoingItem, OutgoingScope } from "../../services/payload";
 import { buildOutgoing } from "../../services/payload";
 import { getSettings, saveSettings, setSessionState } from "../../services/storage";
 import { $, makeIcon, showToast } from "../dom";
 
 let outgoingResolve: ((send: boolean) => void) | null = null;
+/** the set currently on screen; skips, exclusions and the library toggle rebuild it */
+let current: Outgoing | null = null;
+/** the scope the caller asked for, so unticking the library returns to it */
+let requestedScope: OutgoingScope = "tabs";
 
 /**
- * Show the payload and wait for Send/Cancel. Skipped when previews are off or
- * the same set was already approved in this session.
+ * Show the payload and wait for Send/Cancel. Resolves with the set to send
+ * (it may differ from the input: skips, exclusions, the library toggle), or
+ * null on Cancel. Skipped when previews are off or the same set was already
+ * approved in this session.
  */
-export async function confirmOutgoing(outgoing: Outgoing, purpose: string): Promise<boolean> {
+export async function confirmOutgoing(outgoing: Outgoing, purpose: string): Promise<Outgoing | null> {
   const settings = await getSettings();
-  if (!settings.previewOutgoing || outgoing.key === state.approvedOutgoingKey) return true;
+  if (!settings.previewOutgoing || outgoing.key === state.approvedOutgoingKey) return outgoing;
+  requestedScope = outgoing.scope;
   renderOutgoing(outgoing, purpose, settings);
   showView("outgoing");
   const send = await new Promise<boolean>((resolve) => (outgoingResolve = resolve));
   outgoingResolve = null;
+  const result = current ?? outgoing;
+  current = null;
   if (send) {
-    state.approvedOutgoingKey = outgoing.key;
+    state.approvedOutgoingKey = result.key;
     await setSessionState("approvedOutgoingKey", state.approvedOutgoingKey);
   }
   showView("home");
-  return send;
+  return send ? result : null;
 }
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
@@ -40,6 +49,7 @@ const REASON: Record<KeptBackItem["reason"], string> = {
 };
 
 export function renderOutgoing(outgoing: Outgoing, purpose: string, settings: Settings): void {
+  current = outgoing;
   let providerHost = "api.anthropic.com";
   if (settings.provider !== "anthropic") {
     try {
@@ -48,12 +58,28 @@ export function renderOutgoing(outgoing: Outgoing, purpose: string, settings: Se
       providerHost = settings.baseUrl;
     }
   }
+  const includeLibrary = outgoing.scope === "library";
+  const parts = [plural(outgoing.tabs.length, "open tab")];
+  if (includeLibrary) parts.push(plural(outgoing.bookmarks.length, "library bookmark"));
+  parts.push(plural(outgoing.folderCount, "folder name"));
   $("outgoingSummary").textContent =
-    `${purpose} will send ${plural(outgoing.tabs.length, "open tab")}, ${plural(outgoing.bookmarks.length, "bookmark")} ` +
-    `and ${plural(outgoing.folderCount, "folder name")} to ${providerHost}.`;
+    `${purpose} will send ${parts.slice(0, -1).join(", ")} and ${parts.at(-1)} to ${providerHost}.` +
+    (!includeLibrary && outgoing.libraryCount
+      ? ` Your ${plural(outgoing.libraryCount, "library bookmark")} stay in the browser.`
+      : "");
   ($("outgoingAskAgain") as HTMLInputElement).checked = settings.previewOutgoing;
 
-  const rerender = async () => renderOutgoing(await buildOutgoing(), purpose, await getSettings());
+  // the library goes only when the task needs it; the user can add or drop it here
+  const libRow = $("outgoingLibraryRow");
+  libRow.hidden = !outgoing.libraryCount;
+  ($("outgoingIncludeLibrary") as HTMLInputElement).checked = includeLibrary;
+  $("outgoingIncludeLibraryText").textContent =
+    `Also send my ${plural(outgoingLibraryTotal(outgoing), "library bookmark")} — needed only to reorganize or clean up existing folders`;
+
+  const rerender = async (scope: OutgoingScope = outgoing.scope) =>
+    renderOutgoing(await buildOutgoing(scope), purpose, await getSettings());
+  ($("outgoingIncludeLibrary") as HTMLInputElement).onchange = (e) =>
+    void rerender((e.target as HTMLInputElement).checked ? "library" : requestedScope === "library" ? "tabs" : requestedScope);
   const skipUrls = async (urls: string[]) => {
     for (const u of urls) state.sessionExcludedUrls.add(normalizeUrl(u));
     await setSessionState("sessionExcludedUrls", [...state.sessionExcludedUrls]);
@@ -145,6 +171,11 @@ export function renderOutgoing(outgoing: Outgoing, purpose: string, settings: Se
 
   // ---- the literal text
   $("outgoingRaw").textContent = outgoing.text;
+}
+
+/** bookmarks the library toggle would add: what passes the rules, whether or not it is in this set */
+function outgoingLibraryTotal(outgoing: Outgoing): number {
+  return outgoing.scope === "library" ? outgoing.bookmarks.length : outgoing.libraryCount;
 }
 
 function renderKeptBack(items: KeptBackItem[], unskip: (urls: string[]) => Promise<void>): void {

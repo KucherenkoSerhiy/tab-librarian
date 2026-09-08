@@ -1,5 +1,14 @@
 import type { Placement, ProposalFolderEntry, Removal } from "../../types";
-import { getManagedRootId, getPlacements, getRemovals, setManagedRootId, setPlacements, setRemovals } from "./storage";
+import {
+  getFolderNotes,
+  getManagedRootId,
+  getPlacements,
+  getRemovals,
+  setFolderNotes,
+  setManagedRootId,
+  setPlacements,
+  setRemovals,
+} from "./storage";
 import { normalizeUrl } from "../domain/urls";
 
 const ROOT_TITLE = "Tab Librarian";
@@ -94,6 +103,7 @@ export interface ApplyUndoData {
   deletedBookmarks: { url: string; title: string; parentId: string }[];
   placementsSnapshot: Record<string, Placement>;
   removalsSnapshot: Record<string, Removal>;
+  notesSnapshot: Record<string, string>;
 }
 
 export interface ApplyResult {
@@ -118,6 +128,7 @@ export async function applyProposal(
 ): Promise<ApplyResult> {
   const placements = await getPlacements();
   const removals = await getRemovals();
+  const notes = await getFolderNotes();
   const tree = await getManagedTree();
 
   const undo: ApplyUndoData = {
@@ -127,6 +138,7 @@ export async function applyProposal(
     deletedBookmarks: [],
     placementsSnapshot: structuredClone(placements),
     removalsSnapshot: structuredClone(removals),
+    notesSnapshot: structuredClone(notes),
   };
 
   const existingByUrl = new Map<string, { id: string; parentId: string; title: string }>();
@@ -151,14 +163,18 @@ export async function applyProposal(
 
   for (const folder of folders) {
     if (folder.tabs.length === 0 && folder.path.length > 0) {
-      await ensureFolderPath(folder.path, undo.createdFolderIds); // empty folder is a deliberate part of the taxonomy
+      const id = await ensureFolderPath(folder.path, undo.createdFolderIds); // empty folder is a deliberate part of the taxonomy
+      if (folder.note) notes[id] = folder.note;
       continue;
     }
     let folderId: string | null = null;
     for (const tab of folder.tabs) {
       const key = normalizeUrl(tab.url);
       if (!includeUrls.has(key)) continue;
-      folderId ??= await ensureFolderPath(folder.path, undo.createdFolderIds);
+      if (folderId === null) {
+        folderId = await ensureFolderPath(folder.path, undo.createdFolderIds);
+        if (folder.note) notes[folderId] = folder.note; // the model's one-liner becomes the folder's summary in later payloads
+      }
 
       const existing = existingByUrl.get(key);
       const placement = placements[key];
@@ -188,6 +204,7 @@ export async function applyProposal(
 
   await setPlacements(placements);
   await setRemovals(removals);
+  await setFolderNotes(notes);
   return result;
 }
 
@@ -225,6 +242,7 @@ export async function revertApply(undo: ApplyUndoData): Promise<void> {
   }
   await setPlacements(undo.placementsSnapshot);
   await setRemovals(undo.removalsSnapshot);
+  await setFolderNotes(undo.notesSnapshot);
   await reconcile(); // recreated bookmarks have fresh ids — rebind by URL
 }
 

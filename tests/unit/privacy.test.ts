@@ -73,6 +73,58 @@ test("redactUrlForSending: token-like path segments are masked, ordinary paths k
   );
 });
 
+// Vectors from a real payload review (2026-09-08): identifiers that name an
+// account, a document, a session or a person, and what must stay readable.
+test("redactUrlForSending: account, document and session ids from real consoles are masked", () => {
+  const cases: [string, string][] = [
+    // Google Cloud billing account
+    ["https://console.cloud.google.com/billing/01A2B3-C4D5E6-F78901", "https://console.cloud.google.com/billing/~"],
+    // Gemini conversation (16 hex)
+    ["https://gemini.google.com/app/9f8e7d6c5b4a3210", "https://gemini.google.com/app/~"],
+    // AdMob app id (10 digits), GitHub Actions run (11 digits), Confluence page (6 digits)
+    ["https://admob.google.com/v2/apps/1234567890/pubcontrols/ad-rating", "https://admob.google.com/v2/apps/~/pubcontrols/ad-rating"],
+    ["https://github.com/org/repo/actions/runs/12345678901", "https://github.com/org/repo/actions/runs/~"],
+    // Neon project slug with a numeric id inside
+    ["https://console.neon.tech/app/projects/quiet-lake-12345678", "https://console.neon.tech/app/projects/~"],
+    // job posting id
+    ["https://careers.example.com/jobs/6710168-sr-engineer", "https://careers.example.com/jobs/~"],
+  ];
+  for (const [real, sent] of cases) assert.equal(redactUrlForSending(real, true), sent, real);
+});
+
+test("redactUrlForSending: readable paths, short numbers, versions and dates stay", () => {
+  for (const u of [
+    "https://github.com/KucherenkoSerhiy/tab-librarian/pull/2",
+    "https://arxiv.org/html/2606.28367v1",
+    "https://example.com/blog/2024-01-15/release-notes",
+    "https://justjoin.it/job-offer/emagine-polska-software-developer-warszawa-net",
+    "https://es.wikipedia.org/wiki/%C3%8Dndice_de_los_rascacielos",
+    "https://calendar.google.com/calendar/u/0/r/week/2026/7/27",
+  ]) assert.equal(redactUrlForSending(u, true), u, u);
+});
+
+test("redactUrlForSending: local files keep only the file name (no user name, no disk layout)", () => {
+  assert.equal(
+    redactUrlForSending("file:///C:/Users/alice/Downloads/Practical_UI_guidelines.pdf", true),
+    "file:///~/Practical_UI_guidelines.pdf"
+  );
+  assert.equal(redactUrlForSending("file:///C:/repos/myproject/demo/index.html", true), "file:///~/index.html");
+  assert.equal(
+    redactUrlForSending("file:///C:/Users/alice/Downloads/Practical_UI_guidelines.pdf", false),
+    "file:///C:/Users/alice/Downloads/Practical_UI_guidelines.pdf"
+  );
+});
+
+test("redactUrlForSending: tenant subdomains of multi-tenant SaaS hosts are masked", () => {
+  assert.equal(
+    redactUrlForSending("https://acme.atlassian.net/jira/core/projects/PROJ/list", true),
+    "https://~.atlassian.net/jira/core/projects/PROJ/list"
+  );
+  assert.equal(redactUrlForSending("https://acme-corp.slack.com/archives/C012", true), "https://~.slack.com/archives/C012");
+  assert.equal(redactUrlForSending("https://acme.atlassian.net/x", false), "https://acme.atlassian.net/x");
+  assert.equal(redactUrlForSending("https://www.atlassian.com/software/jira", true), "https://www.atlassian.com/software/jira");
+});
+
 test("redactTitle: emails and long digit runs are masked, normal titles untouched", () => {
   assert.equal(redactTitle("Invoice for jane.doe@example.com – Acme"), "Invoice for [email] – Acme");
   assert.equal(redactTitle("Account 1234 5678 9012 3456 – MyBank"), "Account [number] – MyBank");

@@ -36,36 +36,75 @@ export function isExcludedUrl(url: string, domains: string[]): boolean {
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const LONG_HEX = /^[0-9a-f]{20,}$/i;
-const LONG_DIGITS = /^\d{12,}$/;
+const HEX_ID = /^[0-9a-f]{12,}$/i; // hashes, chat/session ids (9f8e7d6c5b4a3210); needs a digit
+const HEX_GROUPS = /^[0-9a-f]{4,}(?:-[0-9a-f]{4,})+$/i; // billing accounts, license keys (01A2B3-C4D5E6-F78901)
+const DIGIT_RUN = /\d{6,}/; // numeric ids anywhere in the segment: 524289, runs/12345678901, quiet-lake-12345678
 const JWT = /^[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}$/;
 const OPAQUE = /^[A-Za-z0-9_-]{24,}$/; // base64url-ish; must also mix digits and both cases
 
-/** A path segment that reads as a secret or an opaque id rather than a word. */
+/**
+ * A path segment that reads as an identifier rather than a word. Identifiers
+ * carry no signal for filing (the title does) and often name an account, a
+ * document, a session or a person, so they are masked when redaction is on.
+ */
 export function looksLikeToken(segment: string): boolean {
-  if (UUID.test(segment) || LONG_HEX.test(segment) || LONG_DIGITS.test(segment) || JWT.test(segment)) return true;
+  if (UUID.test(segment) || JWT.test(segment) || DIGIT_RUN.test(segment)) return true;
+  if ((HEX_ID.test(segment) || HEX_GROUPS.test(segment)) && /\d/.test(segment)) return true;
   return OPAQUE.test(segment) && /\d/.test(segment) && /[a-z]/.test(segment) && /[A-Z]/.test(segment);
+}
+
+/**
+ * Hosts where the subdomain is the customer's name (employer, client, team).
+ * `acme.atlassian.net` says who you work for; `~.atlassian.net` still says
+ * "a Jira/Confluence page", which is all the model needs.
+ */
+const TENANT_HOSTS = [
+  "atlassian.net",
+  "slack.com",
+  "zendesk.com",
+  "okta.com",
+  "sharepoint.com",
+  "onmicrosoft.com",
+  "service-now.com",
+  "freshdesk.com",
+  "monday.com",
+  "bamboohr.com",
+  "workable.com",
+  "notion.site",
+  "myshopify.com",
+  "salesforce.com",
+  "force.com",
+  "auth0.com",
+  "zoom.us",
+];
+
+export function tenantHostOf(hostname: string): string | undefined {
+  const h = hostname.toLowerCase();
+  return TENANT_HOSTS.find((t) => h.endsWith(`.${t}`));
 }
 
 /**
  * The URL as it may leave the browser. Credentials (user:pass@) always go.
  * With `strip`, the query string, the fragment and token-like path segments go
  * too — the model classifies on the title and the readable part of the path.
+ * Local files keep only their file name (a path such as C:/Users/<you>/…
+ * names you and your disk layout); tenant subdomains become `~`.
  */
 export function redactUrlForSending(url: string, strip: boolean): string {
   try {
     const u = new URL(url);
     u.username = "";
     u.password = "";
-    if (strip) {
-      u.search = "";
-      u.hash = "";
-      u.pathname = u.pathname
-        .split("/")
-        .map((seg) => (looksLikeToken(safeDecode(seg)) ? "~" : seg))
-        .join("/");
-    }
-    return u.toString();
+    if (!strip) return u.toString();
+    if (u.protocol === "file:") return `file:///~/${u.pathname.split("/").pop() ?? ""}`;
+    u.search = "";
+    u.hash = "";
+    u.pathname = u.pathname
+      .split("/")
+      .map((seg) => (looksLikeToken(safeDecode(seg)) ? "~" : seg))
+      .join("/");
+    const tenant = tenantHostOf(u.hostname);
+    return tenant ? u.toString().replace(`//${u.host}`, `//~.${tenant}`) : u.toString();
   } catch {
     return url;
   }

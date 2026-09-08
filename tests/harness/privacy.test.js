@@ -52,6 +52,58 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       const after = document.querySelectorAll("#messages .msg, #messages > *").length;
       assert(after === before, "a message was added despite cancel");
     });
+    await t("scope: a chat message sends open tabs and folder summaries, not the library", async () => {
+      $("chatInput").value = "sort my tabs please";
+      $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
+      await wait(600);
+      assert(!$("view-outgoing").hidden, "preview did not open");
+      const raw = JSON.parse($("outgoingRaw").textContent.replace(/<\/?CURRENT STATE>/g, ""));
+      assert(!("existingBookmarks" in raw), "library bookmarks were included for a plain message");
+      assert(Array.isArray(raw.existingFolders) && raw.existingFolders.length > 0, "no folder summaries");
+      assert(raw.existingFolders.every((f) => typeof f.path === "string" && typeof f.bookmarks === "number"), "folder summary lacks path/bookmarks");
+      assert(/library bookmarks? stay in the browser/.test($("outgoingSummary").textContent), `summary: ${$("outgoingSummary").textContent}`);
+      assert(!$("outgoingLibraryRow").hidden && !$("outgoingIncludeLibrary").checked, "library toggle should be visible and off");
+      assert(document.querySelectorAll("#outgoingGroups .og-entry").length === raw.openTabs.length, "rows shown differ from tabs in the payload");
+      $("outgoingCancelBtn").click();
+      await wait(300);
+    });
+    await t("scope: ticking 'also send my library bookmarks' adds them, unticking removes them", async () => {
+      $("chatInput").value = "sort my tabs please";
+      $("composer").dispatchEvent(new Event("submit", { cancelable: true }));
+      await wait(600);
+      const box = $("outgoingIncludeLibrary");
+      box.checked = true;
+      box.dispatchEvent(new Event("change"));
+      await wait(500);
+      let raw = JSON.parse($("outgoingRaw").textContent.replace(/<\/?CURRENT STATE>/g, ""));
+      assert(Array.isArray(raw.existingBookmarks) && raw.existingBookmarks.length > 0, "library not added after ticking");
+      assert(/library bookmark/.test($("outgoingSummary").textContent) && !/stay in the browser/.test($("outgoingSummary").textContent), `summary: ${$("outgoingSummary").textContent}`);
+      box.checked = false;
+      box.dispatchEvent(new Event("change"));
+      await wait(500);
+      raw = JSON.parse($("outgoingRaw").textContent.replace(/<\/?CURRENT STATE>/g, ""));
+      assert(!("existingBookmarks" in raw), "library still present after unticking");
+      $("outgoingCancelBtn").click();
+      await wait(300);
+    });
+    await t("scope: 'Sort unsorted only' sends only unsorted tabs; 'Clean up' sends the library", async () => {
+      const chip = (label) => [...document.querySelectorAll(".chip")].find((b) => b.textContent.trim() === label);
+      chip("Sort unsorted only").click();
+      await wait(600);
+      assert(!$("view-outgoing").hidden, "preview did not open for the unsorted chip");
+      let raw = JSON.parse($("outgoingRaw").textContent.replace(/<\/?CURRENT STATE>/g, ""));
+      assert(raw.openTabs.length > 0 && raw.openTabs.every((t) => t.sorted === false), "a sorted tab was sent for 'unsorted only'");
+      assert(!("existingBookmarks" in raw), "library sent for 'unsorted only'");
+      $("outgoingCancelBtn").click();
+      await wait(300);
+      chip("Clean up").click();
+      await wait(600);
+      raw = JSON.parse($("outgoingRaw").textContent.replace(/<\/?CURRENT STATE>/g, ""));
+      assert(Array.isArray(raw.existingBookmarks) && raw.existingBookmarks.length > 0, "cleanup did not include the library");
+      assert($("outgoingIncludeLibrary").checked, "library toggle should be on for cleanup");
+      $("outgoingCancelBtn").click();
+      await wait(300);
+    });
     await t("privacy: skipping an item in the preview removes it from the next preview", async () => {
       $("chatInput").value = "sort my tabs please";
       $("composer").dispatchEvent(new Event("submit", { cancelable: true }));

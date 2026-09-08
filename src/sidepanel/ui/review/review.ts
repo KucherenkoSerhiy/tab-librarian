@@ -317,7 +317,7 @@ export async function approveProposal(): Promise<void> {
     ].filter(Boolean);
     // the strip stays until undone, dismissed or replaced; nothing to undo → no strip
     await setLastApply(parts.length ? { summary: `Applied · ${parts.join(" · ")}`, undo: result.undo, at: Date.now() } : null);
-    showToast(note);
+    if (!parts.length) showToast(note); // nothing changed → nothing to undo; say so once
   } catch (err) {
     addDisplayMessage({ role: "status", text: `Apply failed: ${err instanceof Error ? err.message : err}` });
     showView("home");

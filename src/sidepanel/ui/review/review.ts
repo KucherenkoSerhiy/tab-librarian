@@ -300,7 +300,8 @@ export async function approveProposal(): Promise<void> {
   ($("approveBtn") as HTMLButtonElement).disabled = true;
   try {
     await snapshotNow("before apply");
-    const result = await applyProposal(state.pendingProposal.folders, included, removeUrls);
+    const applied = { folders: state.pendingProposal.folders, include: [...included], remove: [...removeUrls] };
+    const result = await applyProposal(applied.folders, included, removeUrls);
     let note = `Applied: ${result.created} bookmark(s) created, ${result.moved} moved.`;
     if (result.removed) note += ` ${result.removed} removed.`;
     if (result.skippedManual) note += ` ${result.skippedManual} manual placement(s) left untouched.`;
@@ -316,7 +317,9 @@ export async function approveProposal(): Promise<void> {
       result.removed && `${result.removed} removed`,
     ].filter(Boolean);
     // the strip stays until undone, dismissed or replaced; nothing to undo → no strip
-    await setLastApply(parts.length ? { summary: `Applied · ${parts.join(" · ")}`, undo: result.undo, at: Date.now() } : null);
+    await setLastApply(
+      parts.length ? { summary: parts.join(" · "), undo: result.undo, applied, undone: false, at: Date.now() } : null
+    );
     if (!parts.length) showToast(note); // nothing changed → nothing to undo; say so once
   } catch (err) {
     addDisplayMessage({ role: "status", text: `Apply failed: ${err instanceof Error ? err.message : err}` });

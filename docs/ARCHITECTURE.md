@@ -130,7 +130,7 @@ sequenceDiagram
   R->>U: Review: folders (with "Why: …"), questions, removals
   U->>R: Apply
   R->>R: snapshot, applyProposal writes bookmarks
-  R->>U: Home strip: Applied · n filed — Undo (stays until undone, dismissed or replaced)
+  R->>U: Home strip: Applied · n filed — Undo ⇄ Redo (stays until dismissed or replaced)
 ```
 
 ## 4. Recall (Enter in the search box)

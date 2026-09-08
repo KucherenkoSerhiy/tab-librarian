@@ -1,5 +1,5 @@
 import type { ApiMessage } from "../services/llm/index";
-import type { DisplayMessage, Proposal } from "../../types";
+import type { DisplayMessage, Proposal, ProposalFolderEntry } from "../../types";
 import type { ApplyUndoData } from "../services/bookmarks";
 
 export type View = "home" | "review" | "setup" | "outgoing";
@@ -17,8 +17,15 @@ export const state = {
   applying: false,
   /** first launch: the setup view is a welcome, not options */
   firstRun: false,
-  /** the last apply, revertible from the Home strip until undone, dismissed or replaced */
-  lastApply: null as { summary: string; undo: ApplyUndoData; at: number } | null,
+  /** the last apply: Undo reverts it, then Redo applies it again; dismissed or replaced by the next apply */
+  lastApply: null as {
+    summary: string;
+    undo: ApplyUndoData;
+    /** what was applied, so Redo can apply it again */
+    applied: { folders: ProposalFolderEntry[]; include: string[]; remove: string[] };
+    undone: boolean;
+    at: number;
+  } | null,
 
   // home filtering
   searchQuery: "",

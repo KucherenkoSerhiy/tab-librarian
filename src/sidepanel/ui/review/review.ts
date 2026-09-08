@@ -2,10 +2,11 @@ import { openOrFocusTabWithNotice } from "../tabActions";
 // Proposal review: diff badges, questions, removals, apply/undo, dismiss.
 import type { Proposal, ProposalFolderEntry } from "../../../types";
 import { snapshotNow } from "../../services/backup";
-import { applyProposal, fileTabManually, listFolders, revertApply, unfileQuietly } from "../../services/bookmarks";
+import { applyProposal, fileTabManually, listFolders, unfileQuietly } from "../../services/bookmarks";
 import { on, requestRefresh } from "../../app/bus";
 import { addDisplayMessage, persistChat, proposalMap, sendChat } from "../chat/chat";
 import { $, makeIcon, showToast } from "../dom";
+import { setLastApply } from "../home/undo";
 import { setDrawer, showView } from "../../app/nav";
 import { toggleFolderSelect } from "../picker";
 import { state } from "../../app/state";
@@ -309,12 +310,14 @@ export async function approveProposal(): Promise<void> {
     state.pendingProposal = null;
     updateProposalUi();
     showView("home");
-    showToast(note, async () => {
-      await revertApply(result.undo);
-      state.apiHistory.push({ role: "user", content: "(I undid that apply — the bookmarks were reverted.)" });
-      addDisplayMessage({ role: "status", text: "Apply undone — bookmarks reverted." });
-      await persistChat();
-    });
+    const parts = [
+      result.created && `${result.created} filed`,
+      result.moved && `${result.moved} moved`,
+      result.removed && `${result.removed} removed`,
+    ].filter(Boolean);
+    // the strip stays until undone, dismissed or replaced; nothing to undo → no strip
+    await setLastApply(parts.length ? { summary: `Applied · ${parts.join(" · ")}`, undo: result.undo, at: Date.now() } : null);
+    showToast(note);
   } catch (err) {
     addDisplayMessage({ role: "status", text: `Apply failed: ${err instanceof Error ? err.message : err}` });
     showView("home");

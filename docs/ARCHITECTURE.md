@@ -129,7 +129,8 @@ sequenceDiagram
   C-->>R: emit("proposal")
   R->>U: Review: folders (with "Why: …"), questions, removals
   U->>R: Apply
-  R->>R: applyProposal writes bookmarks, keeps undo data 5 s
+  R->>R: snapshot, applyProposal writes bookmarks
+  R->>U: Home strip: Applied · n filed — Undo (stays until undone, dismissed or replaced)
 ```
 
 ## 4. Recall (Enter in the search box)

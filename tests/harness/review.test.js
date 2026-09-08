@@ -64,10 +64,16 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       await wait(150);
       $("approveBtn").click();
       await wait(700);
-      assert(/Applied/.test(document.querySelector("#toast .toast-text").textContent), "no applied toast");
-      document.querySelector("#toast .undo-btn").click();
+      assert(!$("view-home").hidden, "did not return home after apply");
+      assert(!$("undoStrip").hidden && /Applied/.test($("undoText").textContent), `no undo strip; text: ${$("undoText").textContent}`);
+      assert((await chrome.storage.session.get("lastApply")).lastApply, "undo data not persisted for the session");
+      await wait(5500); // well past the old 5-second toast: the strip must still be there
+      assert(!$("undoStrip").hidden, "undo strip vanished on its own");
+      $("undoBtn").click();
       await wait(700);
       assert(counts() === before, `counters not reverted: "${counts()}" vs "${before}"`);
+      assert($("undoStrip").hidden, "undo strip still shown after undo");
+      assert(!(await chrome.storage.session.get("lastApply")).lastApply, "undo data not cleared after undo");
     });
     await t("review shows the folder note (why grouped)", async () => {
       $("resumeReviewBtn").click();

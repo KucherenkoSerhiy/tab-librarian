@@ -17,6 +17,8 @@ export interface Settings {
   stripQueryStrings: boolean;
   /** Privacy: hosts (one per line) whose tabs/bookmarks are never sent. */
   excludedDomains: string;
+  /** Privacy: never send localhost, private IPs, .local/.internal and bare intranet names. */
+  excludePrivateHosts: boolean;
 }
 
 export type PlacementSource = "manual" | "llm";

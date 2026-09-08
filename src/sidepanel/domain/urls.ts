@@ -22,3 +22,14 @@ export function isSortableUrl(url: string | undefined): url is string {
 export function isLocalFileUrl(url: string): boolean {
   return url.startsWith("file://");
 }
+
+/** Host without www., or "local file" for file:// pages. */
+export function domainOf(url: string): string {
+  try {
+    const u = new URL(url);
+    if (u.protocol === "file:") return "local file";
+    return u.hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}

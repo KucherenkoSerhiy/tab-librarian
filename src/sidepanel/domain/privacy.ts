@@ -4,7 +4,7 @@
 // the user (1) keep whole domains out of that payload, (2) strip query strings
 // and fragments before sending, and (3) map the shortened URLs the model
 // echoes back to the real ones so proposals still resolve to actual tabs.
-import type { Proposal } from "../types";
+import type { Proposal } from "../../types";
 
 /** "bank.example.com, mail.google.com" / one per line → lowercase host list. */
 export function parseExcludedDomains(text: string): string[] {
@@ -35,17 +35,82 @@ export function isExcludedUrl(url: string, domains: string[]): boolean {
   return domains.some((d) => host === d || host.endsWith(`.${d}`));
 }
 
-/** Drop ?query and #fragment — the parts that tend to carry tokens, ids and search terms. */
-export function sanitizeUrlForSending(url: string, strip: boolean): string {
-  if (!strip) return url;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const LONG_HEX = /^[0-9a-f]{20,}$/i;
+const LONG_DIGITS = /^\d{12,}$/;
+const JWT = /^[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}$/;
+const OPAQUE = /^[A-Za-z0-9_-]{24,}$/; // base64url-ish; must also mix digits and both cases
+
+/** A path segment that reads as a secret or an opaque id rather than a word. */
+export function looksLikeToken(segment: string): boolean {
+  if (UUID.test(segment) || LONG_HEX.test(segment) || LONG_DIGITS.test(segment) || JWT.test(segment)) return true;
+  return OPAQUE.test(segment) && /\d/.test(segment) && /[a-z]/.test(segment) && /[A-Z]/.test(segment);
+}
+
+/**
+ * The URL as it may leave the browser. Credentials (user:pass@) always go.
+ * With `strip`, the query string, the fragment and token-like path segments go
+ * too — the model classifies on the title and the readable part of the path.
+ */
+export function redactUrlForSending(url: string, strip: boolean): string {
   try {
     const u = new URL(url);
-    u.search = "";
-    u.hash = "";
+    u.username = "";
+    u.password = "";
+    if (strip) {
+      u.search = "";
+      u.hash = "";
+      u.pathname = u.pathname
+        .split("/")
+        .map((seg) => (looksLikeToken(safeDecode(seg)) ? "~" : seg))
+        .join("/");
+    }
     return u.toString();
   } catch {
     return url;
   }
+}
+
+function safeDecode(seg: string): string {
+  try {
+    return decodeURIComponent(seg);
+  } catch {
+    return seg;
+  }
+}
+
+const EMAIL = /[\w.+-]+@[\w-]+(?:\.[\w-]+)+/g;
+const LONG_NUMBER = /\d(?:[ -]?\d){8,}/g; // 9+ digits, optionally grouped: cards, accounts, phones
+
+/** Titles carry names, emails and account numbers surprisingly often. */
+export function redactTitle(title: string): string {
+  return title.replace(EMAIL, "[email]").replace(LONG_NUMBER, "[number]");
+}
+
+function isPrivateIp(host: string): boolean {
+  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(host);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    return a === 10 || a === 127 || (a === 192 && b === 168) || (a === 172 && b >= 16 && b <= 31) || (a === 169 && b === 254);
+  }
+  const h = host.replace(/^\[|\]$/g, "").toLowerCase();
+  return h === "::1" || h.startsWith("fc") || h.startsWith("fd") || h.startsWith("fe80");
+}
+
+/** localhost, private IP ranges, .local/.internal/.lan/.corp and bare intranet names. */
+export function isPrivateHost(url: string): boolean {
+  let host: string;
+  try {
+    const u = new URL(url);
+    if (u.protocol === "file:") return false; // governed by the local-files setting
+    host = u.hostname.toLowerCase();
+  } catch {
+    return false;
+  }
+  if (host === "localhost" || isPrivateIp(host)) return true;
+  if (/\.(local|internal|lan|home|corp|intranet)$/.test(host)) return true;
+  return !host.includes("."); // bare names only resolve on a LAN
 }
 
 export interface OutgoingMap {
@@ -65,7 +130,7 @@ export function buildOutgoingMap(realUrls: Iterable<string>, strip: boolean): Ou
   const sentFor = new Map<string, string>();
   const realFor = new Map<string, string>();
   for (const real of [...new Set(realUrls)].sort()) {
-    const base = sanitizeUrlForSending(real, strip);
+    const base = redactUrlForSending(real, strip);
     let sent = base;
     for (let n = 2; realFor.has(sent); n++) sent = `${base}#${n}`;
     sentFor.set(real, sent);

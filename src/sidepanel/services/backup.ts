@@ -1,7 +1,7 @@
-import type { Placement, Removal } from "../types";
+import type { Placement, Removal } from "../../types";
 import { ensureFolderPath, ensureManagedRoot, getManagedTree, reconcile, walkTree } from "./bookmarks";
 import { getPlacements, getRemovals, getSettings } from "./storage";
-import { normalizeUrl } from "./urls";
+import { normalizeUrl } from "../domain/urls";
 
 interface Snapshot {
   at: number;

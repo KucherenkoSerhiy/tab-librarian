@@ -6,11 +6,15 @@
   "description": "Tab Librarian - AI librarian for your tabs (Chrome/Brave/Firefox, BYOK)",
   "scripts": {
     "dev": "vite build --watch",
-    "build": "tsc --noEmit && vite build",
+    "build": "npm run check && vite build",
+    "test": "node --test \"tests/unit/*.test.ts\"",
+    "preview:setup": "node tests/harness/make-preview.mjs",
     "preview": "vite preview --port 4173 --strictPort",
-    "preview:setup": "node preview/make-preview.mjs",
+    "test:ui": "npm run build && npm run preview:setup && node tests/harness/run-headless.mjs",
     "build:firefox": "npm run build && node scripts/make-firefox.mjs",
-    "package": "npm run build && powershell -NoProfile -Command \"Compress-Archive -Path dist/* -DestinationPath tab-librarian.zip -Force\""
+    "package": "npm run build && powershell -NoProfile -Command \"Compress-Archive -Path dist/* -DestinationPath tab-librarian.zip -Force\"",
+    "check": "tsc --noEmit && node scripts/check-layers.mjs && npm test",
+    "evidence": "node tests/harness/evidence.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.123.0"

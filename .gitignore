@@ -5,3 +5,6 @@ dist-firefox/
 *.log
 .DS_Store
 marketing/
+
+# IDE
+.idea/

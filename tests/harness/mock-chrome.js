@@ -189,9 +189,9 @@
     tabs: {
       query: async () => clone(demoTabs),
       update: async () => ({}),
-      create: async ({ url } = {}) => {
+      create: async ({ url, title } = {}) => {
         if (url) {
-          addTab(url, url);
+          addTab(title || url, url);
           const tab = clone(demoTabs[demoTabs.length - 1]);
           tabEvents.onCreated.fire(tab);
           return tab;

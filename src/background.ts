@@ -1,8 +1,8 @@
 // Service worker: side-panel behavior, cyclic backups, and the
 // "File this page into…" context menu. All interactive logic lives in the panel.
-import { snapshotNow } from "./sidepanel/backup";
-import { fileTabManually, listFolders } from "./sidepanel/bookmarks";
-import { isSortableUrl } from "./sidepanel/urls";
+import { snapshotNow } from "./sidepanel/services/backup";
+import { fileTabManually, listFolders } from "./sidepanel/services/bookmarks";
+import { isSortableUrl } from "./sidepanel/domain/urls";
 
 // chrome.sidePanel doesn't exist on Firefox (sidebar_action opens the panel there)
 chrome.sidePanel

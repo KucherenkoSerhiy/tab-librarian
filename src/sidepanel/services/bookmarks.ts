@@ -1,13 +1,6 @@
-import type { Placement, ProposalFolderEntry, Removal } from "../types";
-import {
-  getManagedRootId,
-  getPlacements,
-  getRemovals,
-  setManagedRootId,
-  setPlacements,
-  setRemovals,
-} from "./storage";
-import { normalizeUrl } from "./urls";
+import type { Placement, ProposalFolderEntry, Removal } from "../../types";
+import { getManagedRootId, getPlacements, getRemovals, setManagedRootId, setPlacements, setRemovals } from "./storage";
+import { normalizeUrl } from "../domain/urls";
 
 const ROOT_TITLE = "Tab Librarian";
 // pre-rebrand root folders are adopted (and renamed) instead of duplicated

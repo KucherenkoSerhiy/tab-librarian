@@ -1,4 +1,4 @@
-import type { Placement, Removal, Settings } from "../types";
+import type { Placement, Removal, Settings } from "../../types";
 
 const SETTINGS_DEFAULTS: Settings = {
   provider: "anthropic",
@@ -12,6 +12,7 @@ const SETTINGS_DEFAULTS: Settings = {
   previewOutgoing: true,
   stripQueryStrings: true,
   excludedDomains: "",
+  excludePrivateHosts: true,
 };
 
 export async function getSettings(): Promise<Settings> {

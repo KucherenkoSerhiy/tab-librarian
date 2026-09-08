@@ -34,8 +34,8 @@ export async function runFind(query: string): Promise<void> {
     openSetup(false);
     return;
   }
-  const outgoing = await buildOutgoing();
-  if (!(await confirmOutgoing(outgoing, "This search"))) return;
+  const outgoing = await confirmOutgoing(await buildOutgoing("library"), "This search");
+  if (!outgoing) return;
 
   findBusy = true;
   setFindStrip("Asking the librarian…");

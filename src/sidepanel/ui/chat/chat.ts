@@ -5,6 +5,7 @@ import { $, scrollChatToBottom } from "../dom";
 import { friendlyApiError, isAbortError, runChatTurn } from "../../services/llm/index";
 import { setDrawer } from "../../app/nav";
 import { openSetup } from "../options/options";
+import type { OutgoingScope } from "../../services/payload";
 import { buildOutgoing } from "../../services/payload";
 import { confirmOutgoing } from "../privacy/outgoing";
 import { mapProposalBack } from "../../domain/privacy";
@@ -63,7 +64,12 @@ export function renderAllMessages(): void {
   for (const msg of state.displayMessages) renderMessage(msg);
 }
 
-export async function sendChat(userText: string): Promise<void> {
+/**
+ * One chat turn. `scope` decides what the CURRENT STATE block carries: open
+ * tabs plus folder summaries by default; the library only for cleanup, or
+ * when the user ticks it in the Before-sending step.
+ */
+export async function sendChat(userText: string, scope: OutgoingScope = "tabs"): Promise<void> {
   if (busy || !userText.trim()) return;
   const settings = await getSettings();
   if (!settings.apiKey) {
@@ -71,9 +77,8 @@ export async function sendChat(userText: string): Promise<void> {
     return;
   }
 
-  let outgoing = await buildOutgoing();
-  if (!(await confirmOutgoing(outgoing, "This message"))) return;
-  outgoing = await buildOutgoing(); // the preview may have changed the exclusions
+  const outgoing = await confirmOutgoing(await buildOutgoing(scope), "This message");
+  if (!outgoing) return;
 
   busy = true;
   setBusyUi(true);
@@ -179,6 +184,6 @@ export function wireChat(): void {
     }
   });
   document.querySelectorAll<HTMLButtonElement>(".chip").forEach((btn) => {
-    btn.addEventListener("click", () => void sendChat(btn.dataset.quick!));
+    btn.addEventListener("click", () => void sendChat(btn.dataset.quick!, (btn.dataset.scope as OutgoingScope) ?? "tabs"));
   });
 }

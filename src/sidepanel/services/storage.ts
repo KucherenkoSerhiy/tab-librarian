@@ -51,6 +51,16 @@ export async function setRemovals(removals: Record<string, Removal>): Promise<vo
   await chrome.storage.local.set({ removals });
 }
 
+/** One line per folder (keyed by folder id), saved from approved proposals: what belongs there. */
+export async function getFolderNotes(): Promise<Record<string, string>> {
+  const { folderNotes } = await chrome.storage.local.get("folderNotes");
+  return (folderNotes as Record<string, string> | undefined) ?? {};
+}
+
+export async function setFolderNotes(folderNotes: Record<string, string>): Promise<void> {
+  await chrome.storage.local.set({ folderNotes });
+}
+
 // Chat state survives panel close/reopen within a browser session.
 export async function getSessionState<T>(key: string): Promise<T | undefined> {
   const result = await chrome.storage.session.get(key);

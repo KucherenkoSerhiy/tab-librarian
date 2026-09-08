@@ -62,7 +62,7 @@ Dependencies point inward: `ui → app → services → domain`. Screens never i
 | app | `refresh.ts` | chrome event listeners → dirty flags → 2 s poll → renderers; never renders mid-drag or with a picker open |
 | domain | `privacy.ts` | domain exclusion, private-host detection, URL/title redaction, sent→real URL mapping, payload fingerprint |
 | domain | `urls.ts` | URL normalization, sortability, domain of |
-| services | `payload.ts` | builds the `CURRENT STATE` block after the privacy rules, plus what was kept back and why |
+| services | `payload.ts` | builds the `CURRENT STATE` block for a scope (`unsorted` / `tabs` / `library`) after the privacy rules, plus what was kept back and why |
 | services | `llm/` | provider dispatch (`index.ts`), prompts, strict tool schemas + sanitizers, one file per provider |
 | services | `bookmarks.ts` | managed root, folder paths, apply/revert proposals, manual filing, moves, deletes, reconcile |
 | services | `backup.ts` | snapshots (3-hourly, 7 days), export/import |
@@ -76,14 +76,18 @@ Dependencies point inward: `ui → app → services → domain`. Screens never i
 
 ```mermaid
 flowchart LR
-  T[open tabs<br/>title + URL] --> R
-  B[library bookmarks<br/>title + URL + folder] --> R
+  T[open tabs<br/>title + URL] --> S
+  B[library bookmarks<br/>title + URL + folder] --> S
+  S{scope}
+  S -->|"unsorted / tabs (sorting, chat)"| F[folder summaries only<br/>path · count · note]
+  S -->|"library (Clean up, recall,<br/>or ticked in Before sending)"| R
+  F --> R
   R{privacy rules}
   R -->|excluded domain| K[kept back<br/>shown with reason]
   R -->|private network| K
   R -->|skipped this conversation| K
   R -->|passes| X[redact]
-  X -->|"credentials always<br/>query string and fragment<br/>token-like path segments → ~<br/>emails → [email]<br/>9+ digit numbers → [number]"| M[sent→real URL map<br/>deterministic, unique]
+  X -->|"credentials always<br/>query string and fragment<br/>identifier path segments → ~<br/>local files → file name only<br/>tenant.saas.com → ~.saas.com<br/>emails → [email]<br/>9+ digit numbers → [number]"| M[sent→real URL map<br/>deterministic, unique]
   M --> P[CURRENT STATE JSON<br/>+ folder names]
   P --> V[Before sending<br/>groups · kept back · exact text]
   V -->|Send| A[(provider)]
@@ -91,7 +95,9 @@ flowchart LR
   M2 --> RV[Review]
 ```
 
-The preview is skipped only when the fingerprint of the outgoing set equals the last one the user approved in this session, so refining a proposal in chat does not re-ask; adding a tab does.
+Scope is data minimization: sorting sends the open tabs and the *shape* of the library (every folder's path, size and the note saved from the proposal that created it), never the bookmarks. The library itself goes only for **Clean up**, for recall, or when the user ticks *Also send my library bookmarks* on the Before-sending screen; the screen says which case applies ("Your 152 library bookmarks stay in the browser"). `removedByUser` is likewise trimmed to URLs that are in the set.
+
+The preview is skipped only when the fingerprint of the outgoing set equals the last one the user approved in this session, so refining a proposal in chat does not re-ask; adding a tab, or adding the library, does.
 
 ## 3. A chat turn
 
@@ -106,16 +112,16 @@ sequenceDiagram
   participant R as review.ts
 
   U->>C: message (or Sort chip)
-  C->>P: buildOutgoing()
+  C->>P: buildOutgoing(scope) — chip decides: unsorted / tabs / library
   P->>D: exclude / redact / map
-  P-->>C: {text, tabs, bookmarks, keptBack, map, key}
+  P-->>C: {scope, text, tabs, bookmarks, keptBack, map, key}
   C->>O: confirmOutgoing(outgoing)
   alt key already approved this session, or previews off
-    O-->>C: true
+    O-->>C: same outgoing
   else
-    O->>U: Before sending (groups, kept back, exact text)
+    O->>U: Before sending (groups, kept back, exact text, library toggle)
     U->>O: Send / Cancel
-    O-->>C: true / false
+    O-->>C: final outgoing / null
   end
   C->>L: runChatTurn(history + text)
   L-->>C: text + submit_proposal(tool input)
@@ -138,7 +144,7 @@ sequenceDiagram
   participant H as home/tree.ts + unsorted.ts
 
   U->>S: types a description, presses Enter
-  S->>P: buildOutgoing() (same rules as sorting)
+  S->>P: buildOutgoing("library") — recall searches the library
   S->>O: confirmOutgoing("This search")
   O-->>S: true / false
   S->>L: runFindTurn(query, library) — tool call forced

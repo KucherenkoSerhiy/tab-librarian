@@ -133,4 +133,18 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       s.dispatchEvent(new Event("input"));
       await wait(300);
     });
+    await t("'Close sorted tabs' appears only from 4 sorted tabs", async () => {
+      const sortedNow = [...document.querySelectorAll("#unsorted .tab-row")].length; // sanity only
+      assert($("closeSortedBtn").hidden, "button shown with fewer than 4 sorted tabs");
+      const a = await chrome.tabs.create({ url: "https://company.atlassian.net/board", title: "Jira board" });
+      const b = await chrome.tabs.create({ url: "https://developer.mozilla.org/dnd", title: "MDN – Drag and Drop API" });
+      await wait(2600);
+      assert(!$("closeSortedBtn").hidden, "button hidden with 4 sorted tabs");
+      assert(/Close 4 sorted tabs/.test($("closeSortedBtn").textContent), `unexpected label: ${$("closeSortedBtn").textContent}`);
+      await chrome.tabs.remove(a.id);
+      await chrome.tabs.remove(b.id);
+      await wait(2600);
+      assert($("closeSortedBtn").hidden, "button still shown after dropping back to 2");
+      void sortedNow;
+    });
 });

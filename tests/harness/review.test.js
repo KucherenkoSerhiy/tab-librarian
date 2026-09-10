@@ -95,4 +95,17 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       $("reviewBackBtn").click();
       await wait(300);
     });
+    await t("review: 'Ask for changes' sends the request to the AI as a message", async () => {
+      $("resumeReviewBtn").click();
+      await wait(300);
+      assert(!$("view-review").hidden, "review did not open");
+      $("reviewAskInput").value = "split the Learning folder by topic";
+      $("reviewAskForm").dispatchEvent(new Event("submit", { cancelable: true }));
+      await wait(700);
+      assert($("view-review").hidden, "still on the review screen");
+      assert(!$("view-outgoing").hidden, "the message did not reach the sending step");
+      assert($("reviewAskInput").value === "", "input not cleared");
+      $("outgoingCancelBtn").click();
+      await wait(300);
+    });
 });

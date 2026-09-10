@@ -148,5 +148,9 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       for (const tab of made) await chrome.tabs.remove(tab.id);
       await wait(2600);
       assert(btn.hidden === wasHidden, "button did not return to its previous state");
+      // closing managed tabs raises the "keep in library?" strip; answer "keep" so later tests start clean
+      document.querySelectorAll("#recentlyClosed .rc-row .mini-btn.accent-hover").forEach((b) => b.click());
+      await wait(300);
+      assert($("recentlyClosed").hidden, "closed-tab strip left behind");
     });
 });

@@ -23,8 +23,9 @@ export async function renderStats(): Promise<void> {
   foldersCount.textContent = String(bookmarkTotal);
   foldersCount.title = `${bookmarkTotal} bookmarks in ${folders.length} folders`;
 
+  // closing one or two tabs is a click each; the bulk action earns its place from four
   const closeSorted = $("closeSortedBtn") as HTMLButtonElement;
-  closeSorted.hidden = sorted === 0;
+  closeSorted.hidden = sorted < 4;
   closeSorted.textContent = `🧹 Close ${sorted} sorted tab${sorted === 1 ? "" : "s"}`;
 }
 

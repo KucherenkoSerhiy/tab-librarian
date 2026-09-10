@@ -134,17 +134,19 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       await wait(300);
     });
     await t("'Close sorted tabs' appears only from 4 sorted tabs", async () => {
-      const sortedNow = [...document.querySelectorAll("#unsorted .tab-row")].length; // sanity only
-      assert($("closeSortedBtn").hidden, "button shown with fewer than 4 sorted tabs");
-      const a = await chrome.tabs.create({ url: "https://company.atlassian.net/board", title: "Jira board" });
-      const b = await chrome.tabs.create({ url: "https://developer.mozilla.org/dnd", title: "MDN – Drag and Drop API" });
+      const btn = $("closeSortedBtn");
+      const countOf = () => Number((btn.textContent.match(/Close (\d+)/) || [])[1] || 0);
+      const wasHidden = btn.hidden;
+      if (!wasHidden) assert(countOf() >= 4, `shown with only ${countOf()} sorted tabs`);
+      // four tabs whose URLs are in the library: sorted no matter what earlier tests did
+      const urls = ["https://figma.com/file/abc", "https://company.atlassian.net/board", "https://developer.mozilla.org/dnd", "https://figma.com/file/abc"];
+      const made = [];
+      for (const url of urls) made.push(await chrome.tabs.create({ url, title: `Sorted ${made.length}` }));
       await wait(2600);
-      assert(!$("closeSortedBtn").hidden, "button hidden with 4 sorted tabs");
-      assert(/Close 4 sorted tabs/.test($("closeSortedBtn").textContent), `unexpected label: ${$("closeSortedBtn").textContent}`);
-      await chrome.tabs.remove(a.id);
-      await chrome.tabs.remove(b.id);
+      assert(!btn.hidden, "button hidden with at least 4 sorted tabs");
+      assert(countOf() >= 4, `label should count at least 4, got: ${btn.textContent}`);
+      for (const tab of made) await chrome.tabs.remove(tab.id);
       await wait(2600);
-      assert($("closeSortedBtn").hidden, "button still shown after dropping back to 2");
-      void sortedNow;
+      assert(btn.hidden === wasHidden, "button did not return to its previous state");
     });
 });

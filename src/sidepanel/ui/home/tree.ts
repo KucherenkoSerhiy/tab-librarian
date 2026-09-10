@@ -240,16 +240,16 @@ export async function renderTree(): Promise<void> {
     });
     summary.appendChild(addSub);
 
-    // ✕ delete folder (with contents); non-empty folders need a confirming second tap
+    // ✕ delete folder; only a folder that still holds bookmarks asks for a second tap
+    const hasBookmarks = (n: chrome.bookmarks.BookmarkTreeNode): boolean => !!n.url || (n.children ?? []).some(hasBookmarks);
     const del = document.createElement("button");
     del.className = "mini-btn danger-hover";
-    del.title = "Delete folder and its contents";
+    del.title = hasBookmarks(node) ? "Delete folder and its contents" : "Delete folder";
     del.textContent = "✕";
     let delArmed = false;
     del.addEventListener("click", (e) => {
       stopThrough(e);
-      const hasContents = (node.children?.length ?? 0) > 0;
-      if (hasContents && !delArmed) {
+      if (hasBookmarks(node) && !delArmed) {
         delArmed = true;
         del.textContent = "Sure?";
         del.classList.add("danger");

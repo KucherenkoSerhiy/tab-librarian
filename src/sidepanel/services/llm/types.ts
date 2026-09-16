@@ -9,6 +9,8 @@ export interface ChatTurnResult {
   text: string;
   proposal: Proposal | null;
   refusal: string | null;
+  /** The model asked for the library; the caller must answer the tool call after the user decides. */
+  libraryRequest: { reason: string; toolUseId: string } | null;
   /** Assistant + tool_result messages to append to history (already includes them in order). */
   appendToHistory: ApiMessage[];
 }

@@ -16,16 +16,27 @@ let current: Outgoing | null = null;
 /** the scope the caller asked for, so unticking the library returns to it */
 let requestedScope: OutgoingScope = "tabs";
 
+export interface ConfirmOptions {
+  /** show the step even when previews are off or the set was already approved (the model asked for more) */
+  force?: boolean;
+  /** one line above the summary saying who asked and why */
+  note?: string;
+}
+
 /**
  * Show the payload and wait for Send/Cancel. Resolves with the set to send
  * (it may differ from the input: skips, exclusions, the library toggle), or
  * null on Cancel. Skipped when previews are off or the same set was already
- * approved in this session.
+ * approved in this session — unless `force`, which a model-initiated request
+ * always sets: the user, never the model, decides when more leaves the browser.
  */
-export async function confirmOutgoing(outgoing: Outgoing, purpose: string): Promise<Outgoing | null> {
+export async function confirmOutgoing(outgoing: Outgoing, purpose: string, opts: ConfirmOptions = {}): Promise<Outgoing | null> {
   const settings = await getSettings();
-  if (!settings.previewOutgoing || outgoing.key === state.approvedOutgoingKey) return outgoing;
+  if (!opts.force && (!settings.previewOutgoing || outgoing.key === state.approvedOutgoingKey)) return outgoing;
   requestedScope = outgoing.scope;
+  const note = $("outgoingNote");
+  note.hidden = !opts.note;
+  note.textContent = opts.note ?? "";
   renderOutgoing(outgoing, purpose, settings);
   showView("outgoing");
   const send = await new Promise<boolean>((resolve) => (outgoingResolve = resolve));

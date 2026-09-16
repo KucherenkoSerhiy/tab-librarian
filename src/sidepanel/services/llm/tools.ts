@@ -78,6 +78,34 @@ export const PROPOSAL_TOOL = {
   },
 };
 
+/**
+ * The model cannot see the library unless the user chose to send it. This tool
+ * carries no data: it is a request the panel turns into a Before-sending step
+ * the user must approve (always shown, even with previews off).
+ */
+export const REQUEST_LIBRARY_TOOL = {
+  name: "request_library",
+  description:
+    "Ask the user to share their existing library bookmarks (every bookmark with its folder) for this conversation. Call it when the user asks to move, reorganize, split, merge, audit or remove EXISTING bookmarks and existingBookmarks is absent from CURRENT STATE. The user sees your reason and decides; if they decline, continue with the open tabs and say what you could not do.",
+  strict: true,
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      reason: {
+        type: "string",
+        description: "One short line, shown to the user: what you need the bookmarks for.",
+      },
+    },
+    required: ["reason"],
+    additionalProperties: false,
+  },
+};
+
+export function sanitizeReason(input: unknown): string {
+  const r = (input as { reason?: unknown })?.reason;
+  return typeof r === "string" ? r.trim().slice(0, 160) : "";
+}
+
 export const FIND_TOOL = {
   name: "report_matches",
   description: "Report the library entries that best match the user's description, most likely first.",

@@ -26,6 +26,7 @@ async function init(): Promise<void> {
   state.pendingProposal = (await getSessionState<Proposal | null>("pendingProposal")) ?? null;
   state.prevProposalMap = (await getSessionState<Record<string, string> | null>("prevProposalMap")) ?? null;
   state.approvedOutgoingKey = (await getSessionState<string>("approvedOutgoingKey")) ?? "";
+  state.conversationScope = (await getSessionState<typeof state.conversationScope>("conversationScope")) ?? null;
   state.sessionExcludedUrls = new Set((await getSessionState<string[]>("sessionExcludedUrls")) ?? []);
   state.lastApply = (await getSessionState<typeof state.lastApply>("lastApply")) ?? null;
 

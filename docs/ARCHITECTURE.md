@@ -99,6 +99,8 @@ Scope is data minimization: sorting sends the open tabs and the *shape* of the l
 
 The preview is skipped only when the fingerprint of the outgoing set equals the last one the user approved in this session, so refining a proposal in chat does not re-ask; adding a tab, or adding the library, does.
 
+The model can also ask: when a request needs bookmarks it cannot see ("reorganize my folders"), it calls the `request_library` tool, which carries no data. The panel answers with a Before-sending step that is **always shown**, even with previews off, saying who asked and why. Send answers the tool call with the library and keeps it for the rest of the conversation; Cancel answers that the user declined, and the model continues with the open tabs. The model can ask; only the user can send.
+
 ## 3. A chat turn
 
 ```mermaid
@@ -124,6 +126,11 @@ sequenceDiagram
     O-->>C: final outgoing / null
   end
   C->>L: runChatTurn(history + text)
+  alt model calls request_library(reason)
+    C->>O: confirmOutgoing(library, force: true, note: reason)
+    U->>O: Send / Cancel
+    C->>L: tool_result: library text, or "declined"
+  end
   L-->>C: text + submit_proposal(tool input)
   C->>D: mapProposalBack(proposal, map)
   C-->>R: emit("proposal")

@@ -1,5 +1,5 @@
 import type { ApiMessage } from "../services/llm/index";
-import type { DisplayMessage, Proposal, ProposalFolderEntry } from "../../types";
+import type { DisplayMessage, OutgoingScope, Proposal, ProposalFolderEntry } from "../../types";
 import type { ApplyUndoData } from "../services/bookmarks";
 
 export type View = "home" | "review" | "setup" | "outgoing";
@@ -37,6 +37,8 @@ export const state = {
   sessionExcludedUrls: new Set<string>(),
   /** fingerprint of the last outgoing set the user approved — no re-ask while unchanged */
   approvedOutgoingKey: "",
+  /** "library" once the user shared the library in this conversation (on the model's request); New chat resets it */
+  conversationScope: null as OutgoingScope | null,
 
   // tree/list expansion, preserved across re-renders
   openFolders: new Set<string>(),

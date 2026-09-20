@@ -4,6 +4,8 @@ An AI librarian for your browser tabs. A Manifest V3 side-panel extension for Ch
 
 > **Why an API key and not a Claude/ChatGPT subscription?** Consumer subscriptions only authenticate their vendors' own apps — third-party extensions can't use them. Direct API access (pay-per-use, your key) is what keeps this free, private, and backend-less. Sorting ~150 tabs costs a few cents; daily upkeep is fractions of a cent.
 
+**Feedback:** bugs, ideas, or just how it went — [open an issue](https://github.com/KucherenkoSerhiy/tab-librarian/issues) or write to kucherenkoserhiy@gmail.com. The developer reads everything.
+
 ## The panel
 
 Mobile-first (large touch targets, one task per screen), with a one-click 🌙/☀️ **theme toggle** in the header:

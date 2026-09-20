@@ -22,7 +22,7 @@ Every destructive or filing action (file, unfile, close tab(s), delete folder) r
 
 **Initial sort**
 1. Open the side panel (toolbar icon), pick a provider and paste your API key (stored only in `chrome.storage.local`, sent only to that provider).
-2. Hit **Sort all tabs** — or describe your taxonomy in chat first (project names, rules for edge cases).
+2. Hit **Sort all tabs** — or tell the chat what you're working on first (project names, clients, rules for edge cases). **Sort by what you're working on, not by where a tab should go**: a folder per project is one you reopen; a folder per kind of page ("Videos", "Articles") is one you only file into. The AI follows the same rule and parks anything that belongs to no project under `Other/<topic>`.
 3. The model proposes a folder tree with every tab assigned; ambiguous tabs come back as questions. Nothing is applied yet.
 4. Refine in chat, answer questions inline, uncheck what you don't want — each reply produces a fresh, complete proposal, diffed against the last one.
 5. **Apply** creates real bookmark folders + bookmarks under a dedicated `Tab Librarian` folder in *Other Bookmarks*. Applying is **bookmarks-only** — the AI pipeline never touches open tabs; tabs change only through explicit user buttons (close tab, close-all in a cluster, close sorted, open folder as tabs).

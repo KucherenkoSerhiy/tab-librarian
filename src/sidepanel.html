@@ -89,12 +89,12 @@
           <button id="openReviewBtn" class="btn primary">Review →</button>
         </div>
         <div id="quickActions">
-          <button class="chip" data-scope="tabs" data-quick="Please propose a folder structure for all my open tabs. Ask me about anything ambiguous instead of guessing.">Sort all tabs</button>
+          <button class="chip" data-scope="tabs" data-quick="Please propose a folder structure for all my open tabs, organized by what I'm working on — one folder per project, client or course; anything that belongs to no project under Other. Ask me about anything ambiguous instead of guessing.">Sort all tabs</button>
           <button class="chip" data-scope="unsorted" data-quick="Sort only my unsorted tabs into the existing folders. Add subfolders where a folder would get too big. Don't restructure existing folders or invent new top-level ones unless nothing fits — ask me in that case.">Sort unsorted only</button>
           <button class="chip" data-scope="library" data-quick="Do a cleanup audit of my bookmark library: find duplicates, outdated or superseded entries, and overloaded folders. Propose removals (with reasons) and any re-organization. Ask before touching anything I placed manually.">Clean up</button>
         </div>
         <form id="composer">
-          <textarea id="chatInput" rows="1" placeholder="Describe how you'd like tabs organized…"></textarea>
+          <textarea id="chatInput" rows="1" placeholder="What are you working on?"></textarea>
           <button type="submit" id="sendBtn" class="btn primary send" aria-label="Send">↑</button>
         </form>
       </div>

@@ -956,3 +956,7 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 .kb-row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; background: var(--surface); border-radius: var(--radius); opacity: 0.85; }
 .kb-reason { font-size: 12px; color: var(--text-dim); }
 .raw { margin: 0; font: 11px/1.45 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 60vh; overflow: auto; }
+
+/* Review: ask the AI for changes without leaving the screen */
+.ask-row { display: flex; gap: 8px; padding: 6px 12px 0; flex-shrink: 0; }
+.ask-row input { flex: 1; min-width: 0; }

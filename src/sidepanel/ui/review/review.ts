@@ -360,6 +360,17 @@ export function wireReview(): void {
     setDrawer(true);
   });
   $("onlyChangesToggle").addEventListener("change", () => renderReview());
+  // a third answer besides Apply and Dismiss: tell the AI what to change
+  $("reviewAskForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const input = $("reviewAskInput") as HTMLInputElement;
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = "";
+    showView("home");
+    setDrawer(true);
+    void sendChat(text);
+  });
   $("approveBtn").addEventListener("click", () => void approveProposal());
   $("dismissBtn").addEventListener("click", () => void dismissProposal());
 }

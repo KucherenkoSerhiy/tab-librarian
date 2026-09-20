@@ -1,5 +1,13 @@
 export type Provider = "anthropic" | "openai";
 
+/**
+ * What a provider call carries:
+ * unsorted — open tabs not yet in the library + folder summaries
+ * tabs     — every open tab + folder summaries
+ * library  — every open tab + every library bookmark (cleanup, recall, or on the model's request)
+ */
+export type OutgoingScope = "unsorted" | "tabs" | "library";
+
 export interface Settings {
   provider: Provider;
   apiKey: string;

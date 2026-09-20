@@ -66,8 +66,9 @@ export function renderAllMessages(): void {
 
 /**
  * One chat turn. `scope` decides what the CURRENT STATE block carries: open
- * tabs plus folder summaries by default; the library only for cleanup, or
- * when the user ticks it in the Before-sending step.
+ * tabs plus folder summaries by default; the library only for cleanup, when
+ * the user ticks it in the Before-sending step, or once the user has shared
+ * it in this conversation because the model asked (`state.conversationScope`).
  */
 export async function sendChat(userText: string, scope: OutgoingScope = "tabs"): Promise<void> {
   if (busy || !userText.trim()) return;
@@ -77,7 +78,8 @@ export async function sendChat(userText: string, scope: OutgoingScope = "tabs"):
     return;
   }
 
-  const outgoing = await confirmOutgoing(await buildOutgoing(scope), "This message");
+  const effectiveScope: OutgoingScope = state.conversationScope === "library" ? "library" : scope;
+  let outgoing = await confirmOutgoing(await buildOutgoing(effectiveScope), "This message");
   if (!outgoing) return;
 
   busy = true;
@@ -85,13 +87,13 @@ export async function sendChat(userText: string, scope: OutgoingScope = "tabs"):
   addDisplayMessage({ role: "user", text: userText });
   setDrawer(true);
 
+  const historyMark = state.apiHistory.length; // everything past this is dropped if the turn fails
   state.apiHistory.push({ role: "user", content: `${userText}\n\n${outgoing.text}` });
 
-  const bubble = renderMessage({ role: "assistant", text: "Thinking…" });
+  let bubble = renderMessage({ role: "assistant", text: "Thinking…" });
   let streamed = "";
-
-  try {
-    const result = await runChatTurn({
+  const turn = () =>
+    runChatTurn({
       settings,
       history: state.apiHistory,
       onDelta: (delta) => {
@@ -104,8 +106,40 @@ export async function sendChat(userText: string, scope: OutgoingScope = "tabs"):
       },
     });
 
+  try {
+    let result = await turn();
+
+    // The model asked for the library. The tool call carries no data; the
+    // user sees the request on the Before-sending step (always shown) and
+    // decides. Either way the tool call is answered and the model continues.
+    if (!result.refusal && result.libraryRequest && outgoing.scope !== "library") {
+      const { reason, toolUseId } = result.libraryRequest;
+      state.apiHistory.push(...result.appendToHistory);
+      bubble.textContent = result.text.trim() || "I need to see your library bookmarks for that.";
+      state.displayMessages.push({ role: "assistant", text: bubble.textContent });
+      const shared = await confirmOutgoing(await buildOutgoing("library"), "This message", {
+        force: true,
+        note: `The AI asked for your library bookmarks${reason ? `: ${reason}` : ""}`,
+      });
+      let answer: string;
+      if (shared && shared.scope === "library") {
+        outgoing = shared;
+        state.conversationScope = "library";
+        await setSessionState("conversationScope", "library");
+        addDisplayMessage({ role: "status", text: "Library shared with the AI for this conversation." });
+        answer = `The user shared the library. The authoritative state now follows.\n\n${shared.text}`;
+      } else {
+        addDisplayMessage({ role: "status", text: "Library not sent." });
+        answer = "The user declined to share the library. Continue with the open tabs only and say what you could not do.";
+      }
+      state.apiHistory.push({ role: "user", content: [{ type: "tool_result", tool_use_id: toolUseId, content: answer }] });
+      streamed = "";
+      bubble = renderMessage({ role: "assistant", text: "Thinking…" });
+      result = await turn();
+    }
+
     if (result.refusal) {
-      state.apiHistory.pop(); // keep history clean of the refused turn
+      state.apiHistory.length = historyMark; // keep history clean of the refused turn
       bubble.remove();
       addDisplayMessage({ role: "status", text: `Declined: ${result.refusal}` });
     } else {
@@ -124,7 +158,7 @@ export async function sendChat(userText: string, scope: OutgoingScope = "tabs"):
       }
     }
   } catch (err) {
-    state.apiHistory.pop(); // request failed or was stopped — drop the unanswered user turn
+    state.apiHistory.length = historyMark; // request failed or was stopped — drop the unanswered turn
     bubble.remove();
     addDisplayMessage({
       role: "status",
@@ -155,12 +189,14 @@ export function wireChat(): void {
     state.pendingProposal = null;
     state.sessionExcludedUrls = new Set();
     state.approvedOutgoingKey = "";
+    state.conversationScope = null;
     await clearSessionState([
       "apiHistory",
       "displayMessages",
       "pendingProposal",
       "sessionExcludedUrls",
       "approvedOutgoingKey",
+      "conversationScope",
     ]);
     renderAllMessages();
     void emit("proposal");

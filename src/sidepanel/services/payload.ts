@@ -19,12 +19,8 @@ import { getManagedTree } from "./bookmarks";
 import { getFolderNotes, getPlacements, getRemovals, getSettings } from "./storage";
 import { getOpenTabs } from "./tabs";
 
-/**
- * unsorted — open tabs not yet in the library + folder summaries
- * tabs     — every open tab + folder summaries
- * library  — every open tab + every library bookmark (cleanup, recall)
- */
-export type OutgoingScope = "unsorted" | "tabs" | "library";
+import type { OutgoingScope } from "../../types";
+export type { OutgoingScope };
 
 export interface OutgoingItem {
   realUrl: string;

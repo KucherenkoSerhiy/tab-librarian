@@ -2,7 +2,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { Proposal, Settings } from "../../../types";
 import { FIND_SYSTEM_PROMPT, SYSTEM_PROMPT } from "./prompts";
-import { FIND_TOOL, PROPOSAL_TOOL, sanitizeMatches, sanitizeProposal } from "./tools";
+import { FIND_TOOL, PROPOSAL_TOOL, REQUEST_LIBRARY_TOOL, sanitizeMatches, sanitizeProposal, sanitizeReason } from "./tools";
 import type { ApiMessage, ChatTurnResult, FindMatch, FindOptions, TurnOptions } from "./types";
 
 export function makeClient(settings: Settings): Anthropic {
@@ -38,7 +38,7 @@ export async function runTurn(opts: TurnOptions): Promise<ChatTurnResult> {
     // the cache point the API places at the last cacheable block.
     system: [{ type: "text", text: SYSTEM_PROMPT, cache_control: { type: "ephemeral" } }],
     cache_control: { type: "ephemeral" },
-    tools: [PROPOSAL_TOOL],
+    tools: [PROPOSAL_TOOL, REQUEST_LIBRARY_TOOL],
     messages: history,
     ...(opusTier
       ? {
@@ -56,7 +56,7 @@ export async function runTurn(opts: TurnOptions): Promise<ChatTurnResult> {
     const explanation =
       (message as { stop_details?: { explanation?: string } }).stop_details?.explanation ??
       "The model declined to answer this request.";
-    return { text: "", proposal: null, refusal: explanation, appendToHistory: [] };
+    return { text: "", proposal: null, refusal: explanation, libraryRequest: null, appendToHistory: [] };
   }
 
   const text = message.content
@@ -70,7 +70,29 @@ export async function runTurn(opts: TurnOptions): Promise<ChatTurnResult> {
 
   const appendToHistory: ApiMessage[] = [{ role: "assistant", content: message.content }];
 
+  // The library request ends the turn without a tool_result: the caller adds
+  // one after the user approved or declined, then runs the next turn.
+  const libraryUse = message.content.find(
+    (b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use" && b.name === REQUEST_LIBRARY_TOOL.name
+  );
+  if (libraryUse && !toolUse) {
+    return {
+      text,
+      proposal: null,
+      refusal: null,
+      libraryRequest: { reason: sanitizeReason(libraryUse.input), toolUseId: libraryUse.id },
+      appendToHistory,
+    };
+  }
+
   let proposal: Proposal | null = null;
+  if (libraryUse) {
+    // a proposal in the same turn wins; close the stray request so the history stays valid
+    appendToHistory.push({
+      role: "user",
+      content: [{ type: "tool_result", tool_use_id: libraryUse.id, content: "Not asked: a proposal was submitted in the same turn." }],
+    });
+  }
   if (toolUse) {
     proposal = sanitizeProposal(toolUse.input);
     // Close the tool loop so the history stays valid; the turn ends here —
@@ -87,7 +109,7 @@ export async function runTurn(opts: TurnOptions): Promise<ChatTurnResult> {
     });
   }
 
-  return { text, proposal, refusal: null, appendToHistory };
+  return { text, proposal, refusal: null, libraryRequest: null, appendToHistory };
 }
 
 export async function runFind(opts: FindOptions): Promise<FindMatch[]> {

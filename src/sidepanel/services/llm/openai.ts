@@ -3,7 +3,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Proposal, Settings } from "../../../types";
 import { FIND_SYSTEM_PROMPT, SYSTEM_PROMPT } from "./prompts";
-import { FIND_TOOL, PROPOSAL_TOOL, sanitizeMatches, sanitizeProposal } from "./tools";
+import { FIND_TOOL, PROPOSAL_TOOL, REQUEST_LIBRARY_TOOL, sanitizeMatches, sanitizeProposal, sanitizeReason } from "./tools";
 import type { ApiMessage, ChatTurnResult, FindMatch, FindOptions, TurnOptions } from "./types";
 
 export function apiBase(settings: Settings): string {
@@ -98,16 +98,10 @@ export async function runTurn(opts: TurnOptions): Promise<ChatTurnResult> {
     body: JSON.stringify({
       model: settings.model,
       messages: [{ role: "system", content: SYSTEM_PROMPT }, ...toOpenAiMessages(history)],
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: PROPOSAL_TOOL.name,
-            description: PROPOSAL_TOOL.description,
-            parameters: PROPOSAL_TOOL.input_schema,
-          },
-        },
-      ],
+      tools: [PROPOSAL_TOOL, REQUEST_LIBRARY_TOOL].map((t) => ({
+        type: "function",
+        function: { name: t.name, description: t.description, parameters: t.input_schema },
+      })),
     }),
   });
   if (!res.ok) {
@@ -121,19 +115,34 @@ export async function runTurn(opts: TurnOptions): Promise<ChatTurnResult> {
 
   const text = message.content ?? "";
   const toolCall = (message.tool_calls ?? []).find((t) => t?.function?.name === PROPOSAL_TOOL.name);
+  const libraryCall = (message.tool_calls ?? []).find((t) => t?.function?.name === REQUEST_LIBRARY_TOOL.name);
 
   const assistantBlocks: Anthropic.Beta.BetaContentBlockParam[] = [];
   if (text) assistantBlocks.push({ type: "text", text });
 
+  const parseArgs = (call: OpenAiToolCall): unknown => {
+    try {
+      return JSON.parse(call.function.arguments || "{}");
+    } catch {
+      return {};
+    }
+  };
+  if (libraryCall && !toolCall) {
+    const input = parseArgs(libraryCall);
+    assistantBlocks.push({ type: "tool_use", id: libraryCall.id, name: REQUEST_LIBRARY_TOOL.name, input });
+    return {
+      text,
+      proposal: null,
+      refusal: null,
+      libraryRequest: { reason: sanitizeReason(input), toolUseId: libraryCall.id },
+      appendToHistory: [{ role: "assistant", content: assistantBlocks }],
+    };
+  }
+
   let proposal: Proposal | null = null;
   const appendToHistory: ApiMessage[] = [];
   if (toolCall) {
-    let input: unknown = {};
-    try {
-      input = JSON.parse(toolCall.function.arguments || "{}");
-    } catch {
-      /* malformed arguments — sanitize handles the empty object */
-    }
+    const input = parseArgs(toolCall);
     proposal = sanitizeProposal(input);
     assistantBlocks.push({ type: "tool_use", id: toolCall.id, name: PROPOSAL_TOOL.name, input });
   }
@@ -153,7 +162,7 @@ export async function runTurn(opts: TurnOptions): Promise<ChatTurnResult> {
       ],
     });
   }
-  return { text, proposal, refusal: null, appendToHistory };
+  return { text, proposal, refusal: null, libraryRequest: null, appendToHistory };
 }
 
 export async function runFind(opts: FindOptions): Promise<FindMatch[]> {

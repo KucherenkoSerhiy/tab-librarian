@@ -152,6 +152,7 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       document.querySelectorAll("#recentlyClosed .rc-row .mini-btn.accent-hover").forEach((b) => b.click());
       await wait(300);
       assert($("recentlyClosed").hidden, "closed-tab strip left behind");
+    });
     await t("deleting an empty folder needs no confirmation", async () => {
       const rootId = (await chrome.storage.local.get("managedRootId")).managedRootId;
       const folder = await chrome.bookmarks.create({ parentId: rootId, title: "Empty test folder" });

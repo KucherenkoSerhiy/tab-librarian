@@ -133,4 +133,38 @@ window.__harness.suite(async ({ t, assert, wait, $ }) => {
       s.dispatchEvent(new Event("input"));
       await wait(300);
     });
+    await t("'Close sorted tabs' appears only from 4 sorted tabs", async () => {
+      const btn = $("closeSortedBtn");
+      const countOf = () => Number((btn.textContent.match(/Close (\d+)/) || [])[1] || 0);
+      const wasHidden = btn.hidden;
+      if (!wasHidden) assert(countOf() >= 4, `shown with only ${countOf()} sorted tabs`);
+      // four tabs whose URLs are in the library: sorted no matter what earlier tests did
+      const urls = ["https://figma.com/file/abc", "https://company.atlassian.net/board", "https://developer.mozilla.org/dnd", "https://figma.com/file/abc"];
+      const made = [];
+      for (const url of urls) made.push(await chrome.tabs.create({ url, title: `Sorted ${made.length}` }));
+      await wait(2600);
+      assert(!btn.hidden, "button hidden with at least 4 sorted tabs");
+      assert(countOf() >= 4, `label should count at least 4, got: ${btn.textContent}`);
+      for (const tab of made) await chrome.tabs.remove(tab.id);
+      await wait(2600);
+      assert(btn.hidden === wasHidden, "button did not return to its previous state");
+      // closing managed tabs raises the "keep in library?" strip; answer "keep" so later tests start clean
+      document.querySelectorAll("#recentlyClosed .rc-row .mini-btn.accent-hover").forEach((b) => b.click());
+      await wait(300);
+      assert($("recentlyClosed").hidden, "closed-tab strip left behind");
+    await t("deleting an empty folder needs no confirmation", async () => {
+      const rootId = (await chrome.storage.local.get("managedRootId")).managedRootId;
+      const folder = await chrome.bookmarks.create({ parentId: rootId, title: "Empty test folder" });
+      await chrome.bookmarks.create({ parentId: folder.id, title: "Empty child" }); // empty subfolder is not "contents"
+      await wait(2600);
+      const summary = [...document.querySelectorAll("#tree details > summary")].find((s) => s.textContent.includes("Empty test folder"));
+      assert(summary, "empty folder not rendered");
+      const del = summary.querySelector(".mini-btn.danger-hover");
+      assert(del.title === "Delete folder", `title should not mention contents: ${del.title}`);
+      del.click();
+      await wait(700);
+      assert(!/Sure\?/.test(document.body.innerText), "a 'Sure?' confirmation appeared for an empty folder");
+      const left = (await chrome.bookmarks.getChildren(rootId)).some((n) => n.title === "Empty test folder");
+      assert(!left, "empty folder still exists after one click");
+    });
 });

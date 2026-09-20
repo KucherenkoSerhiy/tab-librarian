@@ -959,3 +959,6 @@ input:focus, select:focus, textarea:focus { outline: 2px solid var(--accent); ou
 
 /* Before sending: who asked for more, and why */
 .og-note { color: var(--accent, #6b8cff); font-weight: 600; }
+/* Review: ask the AI for changes without leaving the screen */
+.ask-row { display: flex; gap: 8px; padding: 6px 12px 0; flex-shrink: 0; }
+.ask-row input { flex: 1; min-width: 0; }

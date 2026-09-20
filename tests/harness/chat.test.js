@@ -1,5 +1,15 @@
 // chat tests — run in the browser harness (see tests/harness/run.js)
 window.__harness.suite(async ({ t, assert, wait, $ }) => {
+    await t("chat asks what you are working on, and 'Sort all tabs' says so", async () => {
+      $("newChatBtn").click(); // a fresh conversation shows the empty-state advice
+      await wait(300);
+      const empty = document.querySelector("#messages .chat-empty");
+      assert(empty && /what you're working on/.test(empty.textContent), "empty chat does not say 'what you're working on'");
+      assert($("chatInput").placeholder === "What are you working on?", `placeholder: ${$("chatInput").placeholder}`);
+      const chip = [...document.querySelectorAll(".chip")].find((c) => c.textContent.trim() === "Sort all tabs");
+      assert(chip && /what I'm working on/.test(chip.dataset.quick), "'Sort all tabs' request does not mention what I'm working on");
+      assert(/under Other/.test(chip.dataset.quick), "'Sort all tabs' request does not mention Other");
+    });
     await t("chat drawer toggles both ways", async () => {
       const wasCollapsed = $("chatDrawer").classList.contains("collapsed");
       $("drawerToggle").click();

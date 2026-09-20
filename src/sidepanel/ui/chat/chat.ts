@@ -57,7 +57,7 @@ export function renderAllMessages(): void {
     const empty = document.createElement("div");
     empty.className = "chat-empty";
     empty.innerHTML =
-      '<span class="big-emoji">🗂️</span>Tell me how you think about your tabs — projects, topics, whatever fits — and I\'ll propose a folder structure. Or start with a quick action below.';
+      '<span class="big-emoji">🗂️</span>Tell me what you\'re working on — projects, clients, a course — and I\'ll file your tabs by that, not by what kind of page they are. A folder you come back to beats a folder you file into. Or start with a quick action below.';
     container.appendChild(empty);
     return;
   }
